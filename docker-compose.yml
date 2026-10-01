@@ -1,0 +1,136 @@
+name: socialscope
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: socialscope
+      POSTGRES_PASSWORD: socialscope
+      POSTGRES_DB: socialscope
+    ports:
+      - "127.0.0.1:${SOCIALSCOPE_POSTGRES_PORT:-5434}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U socialscope -d socialscope"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "127.0.0.1:${SOCIALSCOPE_REDIS_PORT:-6381}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  migrate:
+    build: ./backend
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: alembic upgrade head
+    restart: "no"
+
+  seed:
+    build: ./backend
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: python -m app.seed
+    restart: "no"
+
+  backend:
+    build: ./backend
+    ports:
+      - "127.0.0.1:${SOCIALSCOPE_API_PORT:-8002}:8001"
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/app
+      - export_data:/tmp/socialscope_exports
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    environment:
+      CORS_ORIGINS: "http://localhost:${SOCIALSCOPE_WEB_PORT:-3002},http://127.0.0.1:${SOCIALSCOPE_WEB_PORT:-3002}"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8001
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/api/health', timeout=2)",
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+
+  worker:
+    build: ./backend
+    env_file:
+      - .env
+    volumes:
+      - ./backend:/app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+    command: celery -A app.workers.celery_app worker -l info -Q collection,default,celery
+
+  scheduler:
+    build: ./backend
+    env_file:
+      - .env
+    environment:
+      CORS_ORIGINS: "http://localhost:${SOCIALSCOPE_WEB_PORT:-3002},http://127.0.0.1:${SOCIALSCOPE_WEB_PORT:-3002}"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    command: celery -A app.workers.celery_app beat -l info --schedule=/tmp/celerybeat-schedule
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "127.0.0.1:${SOCIALSCOPE_WEB_PORT:-3002}:3001"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3001/"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  export_data:
+  redis_data:

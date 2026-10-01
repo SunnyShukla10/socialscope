@@ -1,0 +1,11 @@
+.env
+.env.*
+.venv
+venv
+.test-deps
+.validation
+__pycache__
+.pytest_cache
+*.pyc
+**/__pycache__
+**/*.pyc
