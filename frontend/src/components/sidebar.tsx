@@ -73,7 +73,7 @@ export function Sidebar({ user }: SidebarProps) {
           <div>
             <span className="text-sm font-bold text-text block leading-none">SocialScope</span>
             <span className="text-[10px] font-semibold text-text-muted tracking-widest uppercase leading-none mt-0.5 block">
-              v0.1.0 pilot
+              Social listening
             </span>
           </div>
         </Link>

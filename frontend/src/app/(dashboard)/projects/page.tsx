@@ -5,6 +5,9 @@ import Link from 'next/link'
 import { deleteProject, getProjects, type Project } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { PlatformBadge } from '@/components/platform-badge'
+import { label } from '@/lib/research'
+import { field } from '@/components/research-ui'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogFooter } from '@/components/ui/dialog'
 import { useToast } from '@/components/ui/toast'
@@ -34,6 +37,9 @@ export default function ProjectsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [status, setStatus] = useState('')
+  const [platform, setPlatform] = useState('')
+  const [sort, setSort] = useState('recent')
   const [projectToDelete, setProjectToDelete] = useState<Project | null>(null)
   const [deleting, setDeleting] = useState(false)
 
@@ -47,10 +53,19 @@ export default function ProjectsPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  const filtered = projects.filter((p) =>
-    p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    (p.description || '').toLowerCase().includes(searchQuery.toLowerCase())
-  )
+  const availablePlatforms = Array.from(new Set(projects.flatMap(p => p.platforms || []))).sort()
+  const hasFilters = Boolean(searchQuery || status || platform)
+  const clearFilters = () => { setSearchQuery(''); setStatus(''); setPlatform('') }
+  const filtered = projects.filter(p =>
+    [p.name, p.description, p.research_question, p.boolean_query, p.query].some(value =>
+      (value || '').toLowerCase().includes(searchQuery.trim().toLowerCase())) &&
+    (!status || p.status === status) && (!platform || p.platforms?.includes(platform))
+  ).sort((a, b) => {
+    if (sort === 'name') return a.name.localeCompare(b.name)
+    if (sort === 'posts') return b.post_count - a.post_count || a.name.localeCompare(b.name)
+    const timestamp = (p: Project) => Date.parse(sort === 'newest' ? p.created_at : p.last_activity || p.updated_at || p.created_at) || 0
+    return timestamp(b) - timestamp(a)
+  })
 
   async function handleDeleteProject() {
     if (!projectToDelete) return
@@ -68,13 +83,13 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div className="p-6 max-w-7xl">
+    <div className="mx-auto p-4 sm:p-6 max-w-7xl">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
         <div>
-          <h2 className="text-xl font-bold text-text">Projects</h2>
+          <h2 className="text-3xl font-bold text-text">Projects</h2>
           <p className="text-text-muted text-sm mt-1">
-            {projects.length} project{projects.length !== 1 ? 's' : ''} total
+            Your conversations, organized by topic.
           </p>
         </div>
         <Link href="/projects/new">
@@ -85,15 +100,24 @@ export default function ProjectsPage() {
         </Link>
       </div>
 
-      {/* Search */}
-      {!loading && projects.length > 0 && (
-        <div className="mb-5 max-w-sm">
-          <Input
-            placeholder="Search projects..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            leftIcon={<Search size={15} />}
-          />
+      {!loading && !error && projects.length > 0 && (
+        <div className="mb-6 space-y-3 rounded-xl border border-border bg-surface p-4">
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[2fr_1fr_1fr_1fr]">
+            <Input aria-label="Search projects" placeholder="Search projects or queries" value={searchQuery} onChange={e => setSearchQuery(e.target.value)} leftIcon={<Search size={15} />} />
+            <select aria-label="Filter by status" className={field} value={status} onChange={e => setStatus(e.target.value)}>
+              <option value="">All statuses</option>{Object.keys(statusVariant).map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+            </select>
+            <select aria-label="Filter by platform" className={field} value={platform} onChange={e => setPlatform(e.target.value)}>
+              <option value="">All platforms</option>{availablePlatforms.map(p => <option key={p} value={p}>{label(p)}</option>)}
+            </select>
+            <select aria-label="Sort projects" className={field} value={sort} onChange={e => setSort(e.target.value)}>
+              <option value="recent">Recently active</option><option value="newest">Newest created</option><option value="name">Name A-Z</option><option value="posts">Most posts</option>
+            </select>
+          </div>
+          <div className="flex items-center justify-between gap-3 text-xs text-text-muted">
+            <span role="status">{filtered.length} of {projects.length} projects</span>
+            {hasFilters && <button className="font-medium text-primary" onClick={clearFilters}>Clear filters</button>}
+          </div>
         </div>
       )}
 
@@ -121,15 +145,15 @@ export default function ProjectsPage() {
           <p className="text-sm font-medium text-text mb-1">Failed to load projects</p>
           <p className="text-xs text-text-muted">{error}</p>
         </div>
-      ) : filtered.length === 0 && searchQuery ? (
+      ) : filtered.length === 0 && hasFilters ? (
         <div className="bg-surface border border-border rounded-lg p-8 text-center">
           <Search size={32} className="text-border mx-auto mb-3" />
-          <p className="text-sm font-medium text-text mb-1">No projects match "{searchQuery}"</p>
+          <p className="text-sm font-medium text-text mb-1">No projects match these filters</p>
           <button
-            onClick={() => setSearchQuery('')}
+            onClick={clearFilters}
             className="text-xs text-primary hover:text-primary-hover transition-colors"
           >
-            Clear search
+            Clear filters
           </button>
         </div>
       ) : projects.length === 0 ? (
@@ -139,7 +163,7 @@ export default function ProjectsPage() {
           </div>
           <h3 className="text-base font-semibold text-text mb-2">Create your first project</h3>
           <p className="text-sm text-text-muted mb-6">
-            Projects help you organize your social listening campaigns. Define your research question and we'll help you collect the right data.
+            Choose a topic and start collecting conversations.
           </p>
           <Link href="/projects/new">
             <Button>
@@ -153,18 +177,18 @@ export default function ProjectsPage() {
           {filtered.map((project) => (
             <div
               key={project.id}
-              className="group bg-surface border border-border rounded-lg p-5 hover:shadow-card-hover transition-all duration-200"
+              className="group bg-surface border border-border rounded-xl p-5 hover:border-primary/40 hover:shadow-card-hover transition-all duration-200"
             >
               {/* Card header */}
               <div className="flex items-start justify-between gap-2 mb-2">
                 <Link href={`/projects/${project.id}`} className="min-w-0">
-                  <h3 className="text-sm font-semibold text-text leading-snug group-hover:text-primary transition-colors line-clamp-2">
+                  <h3 className="text-base font-semibold text-text leading-snug group-hover:text-primary transition-colors line-clamp-2">
                     {project.name}
                   </h3>
                 </Link>
                 <div className="flex items-center gap-1.5 shrink-0">
                   <Badge variant={statusVariant[project.status] || 'muted'}>
-                    {project.status}
+                    {project.status.charAt(0).toUpperCase() + project.status.slice(1)}
                   </Badge>
                   <button
                     type="button"
@@ -180,9 +204,10 @@ export default function ProjectsPage() {
 
               <Link href={`/projects/${project.id}`} className="block">
                 {/* Description */}
-                <p className="text-xs text-text-muted leading-relaxed mb-4 line-clamp-2">
-                  {project.description}
-                </p>
+                {(project.research_question || project.description) && <p className="text-sm text-text-muted leading-relaxed mb-4 line-clamp-2">
+                  {project.research_question || project.description}
+                </p>}
+                {(project.boolean_query || project.query) && <p className="mb-4 truncate rounded-lg bg-background px-3 py-2 font-mono text-xs text-text-muted" title={project.boolean_query || project.query}>{project.boolean_query || project.query}</p>}
 
                 {/* Stats */}
                 <div className="flex items-center gap-4 text-xs text-text-muted">
@@ -205,21 +230,8 @@ export default function ProjectsPage() {
 
                 {/* Platform tags */}
                 {project.platforms && project.platforms.length > 0 && (
-                  <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-border/60">
-                    {project.platforms.slice(0, 4).map((p) => (
-                      <div
-                        key={p}
-                        className="w-5 h-5 rounded-full bg-border/50 flex items-center justify-center"
-                        title={p}
-                      >
-                        <span className="text-[10px] font-bold text-text-muted uppercase">
-                          {p[0]}
-                        </span>
-                      </div>
-                    ))}
-                    {project.platforms.length > 4 && (
-                      <span className="text-xs text-text-muted">+{project.platforms.length - 4}</span>
-                    )}
+                  <div className="flex flex-wrap items-center gap-1.5 mt-4 pt-3 border-t border-border/60">
+                    {project.platforms.map(p => <PlatformBadge key={p} platform={p} />)}
                     <ArrowRight
                       size={14}
                       className="ml-auto text-text-muted opacity-0 group-hover:opacity-100 transition-opacity"

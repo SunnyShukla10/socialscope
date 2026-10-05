@@ -1,8 +1,22 @@
-'use client'
-import {useEffect,useState} from 'react'
+﻿'use client'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import {fetchApi,errorMessage,SourceInfo,label} from '@/lib/research'
-import {Project} from '@/lib/api'
-import {Panel,ErrorBox,button,secondary} from '@/components/research-ui'
-export default function Dashboard(){const [projects,setProjects]=useState<Project[]>([]);const [sources,setSources]=useState<SourceInfo>();const [error,setError]=useState('');useEffect(()=>{Promise.all([fetchApi<Project[]>('/projects'),fetchApi<SourceInfo>('/sources')]).then(([p,s])=>{setProjects(p);setSources(s)}).catch(e=>setError(errorMessage(e)))},[])
- return <div className="mx-auto max-w-6xl space-y-6 p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><p className="text-xs uppercase tracking-wider text-primary">SocialScope research pilot</p><h1 className="mt-2 text-3xl font-bold">Research conversations over time</h1><p className="mt-3 max-w-2xl text-text-muted">Define a question, preview your search, and build a dataset you can inspect and explain.</p></div><Link className={button} href="/projects/new">New project</Link></div><ErrorBox message={error}/><div className="grid gap-4 sm:grid-cols-3">{[['Projects',projects.length],['Unique project posts',projects.reduce((s,p)=>s+p.post_count,0)],['Maximum posts per pull',5000]].map(([title,n])=><Panel key={title}><p className="text-sm text-text-muted">{title}</p><p className="mt-2 text-3xl font-bold">{Number(n).toLocaleString()}</p></Panel>)}</div><Panel><div className="flex justify-between"><h2 className="font-semibold">Recent projects</h2><Link className="text-sm text-primary" href="/projects">View all</Link></div>{projects.length?projects.slice(0,5).map(p=><Link key={p.id} className="mt-3 flex justify-between rounded-lg border border-border p-4 hover:bg-background" href={`/projects/${p.id}`}><span>{p.name}</span><span className="text-sm text-text-muted">{p.post_count} posts</span></Link>):<p className="mt-4 text-sm text-text-muted">No projects yet. Create one to define your question and choose sources.</p>}</Panel><Panel><h2 className="font-semibold">Source availability</h2><div className="mt-4 grid gap-3 sm:grid-cols-3">{sources?.sources.map(s=><div key={s.platform} className="rounded-lg bg-background p-3"><p className="text-sm font-medium">{label(s.platform)} {s.comparison&&<span className="text-xs text-primary">Comparison</span>}</p><p className="mt-1 text-xs text-text-muted">{s.provider} / {s.configured?'Configured':'Missing provider key'}</p></div>)}</div><p className="mt-4 text-xs text-text-muted">{sources?.account_limit_warning}</p></Panel><p className="text-xs text-text-muted">Version {sources?.version||'0.1.0-pilot'} / build {sources?.build||'pilot-local'}. Feedback: task attempted, expected result, actual result, project and run ID. Remove credentials before sharing diagnostics.</p></div>}
+import { fetchApi, errorMessage, type SourceInfo } from '@/lib/research'
+import { type Project } from '@/lib/api'
+import { PlatformBadge } from '@/components/platform-badge'
+import { Panel, ErrorBox, button } from '@/components/research-ui'
+
+export default function Dashboard() {
+  const [projects, setProjects] = useState<Project[]>([])
+  const [sources, setSources] = useState<SourceInfo>()
+  const [error, setError] = useState('')
+  useEffect(() => { Promise.all([fetchApi<Project[]>('/projects'), fetchApi<SourceInfo>('/sources')]).then(([p, s]) => { setProjects(p); setSources(s) }).catch(e => setError(errorMessage(e))) }, [])
+  const recent = [...projects].sort((a,b) => Date.parse(b.last_activity || b.created_at) - Date.parse(a.last_activity || a.created_at)).slice(0,5)
+  return <div className="mx-auto max-w-6xl space-y-6 p-4 sm:p-6">
+    <div className="flex flex-wrap items-start justify-between gap-4"><div><h1 className="text-3xl font-bold">Your listening workspace</h1><p className="mt-3 text-text-muted">Explore conversations. Find patterns. Build your next insight.</p></div><Link className={button} href="/projects/new">New project</Link></div>
+    <ErrorBox message={error}/>
+    <div className="grid gap-4 sm:grid-cols-3">{[['Projects', projects.length], ['Collected posts', projects.reduce((sum,p) => sum+p.post_count,0)], ['Active projects', projects.filter(p=>p.status==='active').length]].map(([title,n]) => <Panel key={title}><p className="text-sm text-text-muted">{title}</p><p className="mt-2 text-3xl font-bold">{Number(n).toLocaleString()}</p></Panel>)}</div>
+    <Panel><div className="flex justify-between"><h2 className="font-semibold">Recent projects</h2><Link className="text-sm text-primary" href="/projects">View all</Link></div>{recent.length ? recent.map(p => <Link key={p.id} className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-4 hover:bg-background" href={`/projects/${p.id}`}><div><span className="font-medium">{p.name}</span><div className="mt-2 flex flex-wrap gap-1.5">{p.platforms?.map(platform=><PlatformBadge key={platform} platform={platform}/>)}</div></div><span className="text-sm text-text-muted">{p.post_count.toLocaleString()} posts</span></Link>) : <p className="mt-4 text-sm text-text-muted">Create a project to start exploring a topic.</p>}</Panel>
+    <Panel><h2 className="font-semibold">Your platforms</h2><div className="mt-4 grid gap-3 sm:grid-cols-3">{sources?.sources.map(s=><div key={s.platform} className="rounded-lg bg-background p-3"><PlatformBadge platform={s.platform}/><p className={`mt-2 text-xs ${s.configured ? 'text-emerald-700' : 'text-text-muted'}`}>{s.configured ? 'Connected' : 'Setup required'}</p></div>)}</div></Panel>
+  </div>
+}

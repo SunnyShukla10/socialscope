@@ -65,7 +65,7 @@ export default function LoginPage() {
           </div>
           <div>
             <span className="text-white font-bold text-lg block leading-none">SocialScope</span>
-            <span className="text-white/60 text-[10px] font-semibold tracking-widest uppercase">Research pilot</span>
+            <span className="text-white/60 text-[10px] font-semibold tracking-widest uppercase">Social listening</span>
           </div>
         </div>
 
@@ -78,8 +78,8 @@ export default function LoginPage() {
             {[
               {
                 icon: <Search size={18} />,
-                title: 'Budgeted collection',
-                description: 'Budgeted search previews across configured sources',
+                title: 'Search & collect',
+                description: 'Find conversations across your social platforms',
               },
               {
                 icon: <BarChart2 size={18} />,
@@ -120,7 +120,7 @@ export default function LoginPage() {
             </div>
             <div>
               <span className="text-text font-bold text-base block leading-none">SocialScope</span>
-              <span className="text-text-muted text-[10px] font-semibold tracking-widest uppercase">Research pilot</span>
+              <span className="text-text-muted text-[10px] font-semibold tracking-widest uppercase">Social listening</span>
             </div>
           </div>
 
