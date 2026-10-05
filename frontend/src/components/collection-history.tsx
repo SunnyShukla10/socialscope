@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, type ReactNode } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
+import { queryPulls, pullAnchor } from '@/lib/query-pulls'
 import { Search } from 'lucide-react'
 import { type Run, active, dateLabel } from '@/lib/research'
 import { PlatformBadge } from '@/components/platform-badge'
@@ -22,20 +23,19 @@ export function CollectionHistory({ runs, projectId, busy, inFlight, resume, can
 }) {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
-  const grouped = new Map<string, Run[]>()
-  const ordered = [...runs].sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at) || a.id.localeCompare(b.id))
-  ordered.forEach(run => {
-    const key = run.pull_id || run.id
-    grouped.set(key, [...(grouped.get(key) || []), run])
-  })
-  const pulls = Array.from(grouped.entries()).map(([id, entries], index) => ({ id, entries, number: index + 1 }))
-    .reverse().filter(({ entries }) => entries.some(run =>
-      [run.name, ...run.query_versions.map(q => q.boolean_query)].join(' ').toLowerCase().includes(search.trim().toLowerCase())
-    ) && (!status || (status === 'active' ? active(entries[entries.length - 1].status) : entries[entries.length - 1].status === status)))
+  const allPulls = queryPulls(runs)
+  const pulls = allPulls.filter(({ entries, latest }) => entries.some(run =>
+    [run.name, ...run.query_versions.map(q => q.boolean_query)].join(' ').toLowerCase().includes(search.trim().toLowerCase())
+  ) && (!status || (status === 'active' ? active(latest.status) : latest.status === status)))
+  useEffect(() => {
+    if (!runs.length || !window.location.hash) return
+    const target = document.getElementById(window.location.hash.slice(1))
+    target?.scrollIntoView({ block: 'start' })
+  }, [runs.length])
 
   return <section className="space-y-4">
     <div className="flex flex-wrap items-center justify-between gap-3">
-      <div><h2 className="text-lg font-semibold">Query pulls</h2><p className="mt-1 text-sm text-text-muted">{grouped.size} pulls · {runs.length} previews and collections</p></div>
+      <div><h2 className="text-lg font-semibold">Query pulls</h2><p className="mt-1 text-sm text-text-muted">{allPulls.length} pulls · {runs.length} previews and collections</p></div>
     </div>
     {runs.length > 0 && <div className="flex flex-wrap items-center gap-3">
       <div className="relative min-w-0 flex-1"><Search size={15} aria-hidden="true" className="absolute left-3 top-3 text-text-muted"/><input aria-label="Search query pulls" className={field + ' pl-9'} placeholder="Find a query or collection" value={search} onChange={e => setSearch(e.target.value)}/></div>
@@ -46,7 +46,7 @@ export function CollectionHistory({ runs, projectId, busy, inFlight, resume, can
     {pulls.map(({ id, entries, number }) => {
       const latest = entries[entries.length - 1]
       const platforms = Array.from(new Set(entries.flatMap(r => r.platforms)))
-      return <Panel key={id} className={`border-l-4 ${accents[(number - 1) % accents.length]}`}>
+      return <div key={id} id={pullAnchor(id)} className="scroll-mt-24 rounded-xl target:ring-2 target:ring-primary/40"><Panel className={`border-l-4 ${accents[(number - 1) % accents.length]}`}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0"><p className="text-xs font-semibold uppercase tracking-wider text-text-muted">Pull {number.toString().padStart(2, '0')} · {dateLabel(entries[0].created_at)}</p><h3 className="mt-2 break-words text-lg font-semibold">{entries[0].query_versions[0]?.boolean_query || entries[0].name}</h3></div>
           <Badge variant={statusVariant(latest.status)}>{latest.status.replaceAll('_', ' ')}</Badge>
@@ -68,7 +68,7 @@ export function CollectionHistory({ runs, projectId, busy, inFlight, resume, can
             {run.preview_examples?.length > 0 && <details className="mt-3"><summary className="cursor-pointer text-xs font-medium text-primary">Preview examples ({run.preview_examples.length})</summary><div className="mt-3 grid gap-3 md:grid-cols-2">{run.preview_examples.slice(0,12).map(post => <article key={post.id} className="rounded-lg bg-background p-3"><div className="flex flex-wrap items-center gap-2"><PlatformBadge platform={post.platform}/><span className="text-xs text-text-muted">{dateLabel(post.published_at)}</span></div><p className="mt-2 whitespace-pre-wrap break-words text-sm">{post.body.slice(0,600)}</p>{post.url && <a href={post.url} target="_blank" rel="noopener noreferrer" className="mt-2 block text-xs text-primary">Original post</a>}</article>)}</div><p className="mt-3 text-xs text-text-muted">Preview examples are not a representative sample or a prediction of collection yield.</p></details>}
           </div>)}
         </div>
-      </Panel>
+      </Panel></div>
     })}
   </section>
 }
