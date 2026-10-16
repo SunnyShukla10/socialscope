@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { queryPulls, pullAnchor } from '@/lib/query-pulls'
 import { Search } from 'lucide-react'
@@ -17,9 +17,9 @@ function statusVariant(status: string): 'success' | 'warning' | 'danger' | 'info
   return active(status) ? 'info' : 'muted'
 }
 
-export function CollectionHistory({ runs, projectId, busy, inFlight, resume, cancel, renderBudget }: {
+export function CollectionHistory({ runs, projectId, busy, inFlight, resume, cancel }: {
   runs: Run[]; projectId: string; busy: boolean; inFlight: boolean
-  resume: (run: Run) => void; cancel: (run: Run) => void; renderBudget: (run: Run) => ReactNode
+  resume: (run: Run) => void; cancel: (run: Run) => void
 }) {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
@@ -63,7 +63,7 @@ export function CollectionHistory({ runs, projectId, busy, inFlight, resume, can
             {run.error_message && <p role="status" className="mt-3 text-sm text-red-700">{run.error_message}</p>}
             <details className="mt-3"><summary className="cursor-pointer text-xs font-medium text-text-muted">Source breakdown & collection details</summary>
               <div className="mt-3 overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-border text-xs text-text-muted"><th className="p-2">Platform</th><th className="p-2">Requested</th><th className="p-2">Collected</th><th className="p-2">Outcome</th></tr></thead><tbody>{run.platforms.map(p => <tr key={p} className="border-b border-border"><td className="p-2"><PlatformBadge platform={p}/></td><td className="p-2">{run.platform_allocations[p] || 0}</td><td className="p-2">{run.platform_states[p]?.posts_collected || 0}</td><td className="p-2 text-xs">{run.platform_states[p]?.provider_stop_reason || run.platform_states[p]?.status}<p className="mt-1 text-red-700">{run.platform_states[p]?.error}</p>{run.platform_states[p]?.provider_stop_details && <details className="mt-2"><summary className="cursor-pointer">Diagnostics</summary><pre className="whitespace-pre-wrap break-all">{JSON.stringify(run.platform_states[p].provider_stop_details, null, 2)}</pre></details>}</td></tr>)}</tbody></table></div>
-              <div className="mt-3">{renderBudget(run)}</div><p className="mt-3 break-all text-xs text-text-muted">Pull ID: {id} · Run ID: {run.id}</p>
+              <p className="mt-3 break-all text-xs text-text-muted">Pull ID: {id} · Run ID: {run.id}</p>
             </details>
             {run.preview_examples?.length > 0 && <details className="mt-3"><summary className="cursor-pointer text-xs font-medium text-primary">Preview examples ({run.preview_examples.length})</summary><div className="mt-3 grid gap-3 md:grid-cols-2">{run.preview_examples.slice(0,12).map(post => <article key={post.id} className="rounded-lg bg-background p-3"><div className="flex flex-wrap items-center gap-2"><PlatformBadge platform={post.platform}/><span className="text-xs text-text-muted">{dateLabel(post.published_at)}</span></div><p className="mt-2 whitespace-pre-wrap break-words text-sm">{post.body.slice(0,600)}</p>{post.url && <a href={post.url} target="_blank" rel="noopener noreferrer" className="mt-2 block text-xs text-primary">Original post</a>}</article>)}</div><p className="mt-3 text-xs text-text-muted">Preview examples are not a representative sample or a prediction of collection yield.</p></details>}
           </div>)}

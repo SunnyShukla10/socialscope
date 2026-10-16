@@ -85,3 +85,33 @@ def test_project_launch_payload_includes_initial_job():
     assert payload.name == "Collection Project"
     assert payload.initial_job.query == "people AND saying"
     assert payload.initial_job.requested_post_count == 300
+
+
+@pytest.mark.parametrize("shares", [
+    {"tiktok": -1}, {"tiktok": 101}, {"reddit": 20},
+    {"tiktok": 80, "instagram": 30}, {"tiktok": 40, "instagram": 40},
+    {"tiktok": float("nan")}, {"tiktok": float("inf")},
+])
+def test_invalid_custom_distributions_are_rejected(shares):
+    with pytest.raises(ValidationError):
+        SearchJobCreate(name="Custom", query="transit", platforms=["tiktok", "instagram"],
+                        platform_percentages=shares)
+
+
+def test_partial_percentage_leaves_remaining_share_on_defaults():
+    allocation = allocate_post_counts(["tiktok", "instagram", "facebook"], 1000, {"facebook": 50})
+    assert allocation == {"tiktok": 343, "instagram": 157, "facebook": 500}
+
+
+def test_custom_percentage_rounding_and_zero_allocation():
+    allocation = allocate_post_counts(["tiktok", "instagram", "facebook"], 101,
+                                      {"tiktok": 50, "instagram": 50, "facebook": 0})
+    assert sum(allocation.values()) == 101
+    assert allocation["facebook"] == 0
+    assert sorted(allocation.values()) == [0, 50, 51]
+
+
+def test_percentage_keys_normalize_x_alias():
+    job = SearchJobCreate(name="Custom", query="transit", platforms=["x", "reddit"],
+                          platform_percentages={"X": 75})
+    assert job.platform_percentages == {"twitter": 75}

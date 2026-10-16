@@ -48,7 +48,7 @@ Project PATCH currently accepts only `name`, `description`, `domain`, and `statu
 Send that body to POST /api/projects. Then send to its jobs route:
 
 ```json
-{"name":"Transit search preview","mode":"preview","query":"public transit","platforms":["tiktok","twitter","reddit","youtube"],"date_from":"2026-08-01T00:00:00Z","date_to":"2026-08-31T23:59:59.999999Z","requested_post_count":500,"comparison_limit":8,"primary_credit_limit":20,"request_limit":20}
+{"name":"Transit search preview","mode":"preview","query":"public transit","platforms":["tiktok","twitter","reddit","youtube"],"date_from":"2026-08-01T00:00:00Z","date_to":"2026-08-31T23:59:59.999999Z","requested_post_count":500}
 ```
 
 Creating a job can spend provider credits once a worker executes it; these examples are not offline checks. Set `mode` explicitly: it defaults to `collection`, not `preview`. The total target defaults to 500 when neither count input is provided.
@@ -59,11 +59,11 @@ The response contains run `id`, `pull_id`, mode, status, platform allocations/st
 
 ## Continue a pull
 
-Include the returned pull_id in subsequent preview revisions or the full collection. Keep selected sources unchanged. Set mode=collection to collect within the same allowance. One active run is allowed per pull and at most one full run. After a full run is created, that pull accepts no further previews or collections, even if the run fails or is cancelled. Conflicts return 409; changing sources returns 422. Pull limits are fixed on creation, even if new values are sent later. Omitting pull_id starts a **new** allowance; APIs do not infer relatedness from query text.
+Include the returned pull_id in subsequent preview revisions or the full collection. Keep selected sources unchanged. Set mode=collection to continue the same pull. One active run is allowed per pull and at most one full run. After a full run is created, that pull accepts no further previews or collections, even if the run fails or is cancelled. Conflicts return 409; changing sources returns 422. Omitting pull_id starts a **new** pull; APIs do not infer relatedness from query text.
 
-Comparison sources share 5-8 credits total (default/max eight). Predictable integer shares follow X, Reddit, YouTube order; unused shares do not transfer. Primary SociaVault credit limit defaults to 20, range 1-100 per primary source. Request limit defaults to 20, range 1-100 per source for the entire pull. Each preview additionally has a small attempt limit: one normally, two Facebook, three Instagram outer SDK operations. Retries count. No more than 5,000 unique stored identities are accepted across all previews/revisions/full runs within a pull.
+Full collections have no SocialScope credit cap or per-pull request allowance, including existing pulls. Legacy `comparison_limit`, `primary_credit_limit`, and `request_limit` inputs are ignored. Provider balances, rate limits, pagination safeguards, cancellation, and requested post targets still apply. Each preview has a small attempt limit: one normally, two Facebook, three Instagram outer SDK operations. Retries count. No more than 5,000 unique stored identities are accepted across previews, revisions, and the full run within a pull.
 
-Usage is **cumulative for the pull**, not isolated to the displayed run. Per-platform fields include requests, reserved (unsettled reservations), estimated, reported, unknown_requests, charged_allowance, credit_limit, and credits_bounded. Do not sum usage snapshots from multiple runs. Ambiguous usage remains debited. Instagram has credits_bounded=false; operation counts are not a claimed credit ceiling. Unknown SociaVault endpoint costs fail closed.
+Usage is cumulative for the pull and remains recorded internally. The response reports `credit_cap: null`, plus per-platform requests, reserved estimates, estimated usage, reported usage, and unknown requests. These are usage observations, not application credit debits. Do not sum usage snapshots across runs. The UI shows a short reminder to start with a preview and check the provider balance before larger pulls.
 
 Status: pending, queued, running, cancelling, completed, completed_with_errors, cancelled, failed. Platform details distinguish provider stop reason, error, observed publication bounds, and available duplicate/out-of-range/page metrics. A successful POST is not proof of successful collection. Remote work already submitted may continue after cancellation.
 
@@ -82,3 +82,20 @@ CSV is the implemented export format; use `format: "csv"` (the schema does not c
 ## Optional query suggestions
 
 `POST /api/llm/generate-queries` uses local deterministic suggestions when OPENAI_API_KEY is absent. If that key is configured, this helper calls OpenAI and may incur separate charges; those charges are not covered by the social-provider pull ledger. It is not called automatically by the pilot collection UI.
+
+## Custom post distribution
+
+`POST /api/projects/{project_id}/jobs` accepts optional `platform_percentages`,
+for example `{"facebook": 50}`. Each supplied percentage fixes that selected
+source's share; unspecified sources split the remainder using the existing
+weights. Omit the field or send `{}` for defaults. Values must be finite and
+between 0 and 100; their sum cannot exceed 100. If every selected source has
+an explicit value, the sum must be 100. Zero is allowed and makes no provider
+requests for that source. Whole-post rounding preserves the requested total.
+
+Responses retain `platform_percentages` for continuing a pull. Previews cap
+allocated counts at 20 per source and retain the full distribution settings.
+Post shares do not guarantee result volume or credit cost.
+
+Existing installations need migration 013 (`alembic upgrade head`) before
+running the updated backend and workers; Compose's migrate service applies it.

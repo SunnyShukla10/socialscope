@@ -6,7 +6,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "node tests/query-validation.test.mjs && node tests/collection-progress.test.mjs && node tests/results-refresh.test.mjs && node tests/collection-cancellation.test.mjs && node tests/session-connectivity.test.mjs"
+    "test": "node tests/post-distribution.test.mjs && node tests/query-validation.test.mjs && node tests/collection-progress.test.mjs && node tests/results-refresh.test.mjs && node tests/collection-cancellation.test.mjs && node tests/session-connectivity.test.mjs"
   },
   "dependencies": {
     "next": "14.2.15",

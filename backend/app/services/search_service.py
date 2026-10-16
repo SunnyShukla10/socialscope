@@ -33,7 +33,7 @@ PLATFORM_ALLOCATION_WEIGHTS = {
 logger = logging.getLogger(__name__)
 
 
-def allocate_post_counts(platforms: list[str], requested_total: int) -> dict[str, int]:
+def allocate_post_counts(platforms: list[str], requested_total: int, percentages: dict[str, float] | None = None) -> dict[str, int]:
     unique_platforms = []
     for platform in platforms:
         normalized = platform.lower()
@@ -47,6 +47,13 @@ def allocate_post_counts(platforms: list[str], requested_total: int) -> dict[str
         platform: PLATFORM_ALLOCATION_WEIGHTS.get(platform, 1.0)
         for platform in unique_platforms
     }
+    percentages = percentages or {}
+    if percentages:
+        automatic = [p for p in unique_platforms if p not in percentages]
+        remaining = max(0.0, 100 - sum(percentages.values()))
+        auto_weight = sum(weights[p] for p in automatic)
+        weights = {p: percentages[p] if p in percentages else remaining * weights[p] / auto_weight
+                   for p in unique_platforms}
     total_weight = sum(weights.values())
     raw_allocations = {
         platform: requested_total * weight / total_weight
@@ -88,7 +95,7 @@ class SearchService:
             raise HTTPException(status_code=404, detail="Project not found")
 
         from app.models.collection_pull import CollectionPull
-        from app.services.budget_service import comparison_allocations, FRESH_SECONDS
+        from app.services.budget_service import FRESH_SECONDS
         import hashlib, json
         from datetime import timedelta
         fingerprint = hashlib.sha256(json.dumps({
@@ -107,28 +114,29 @@ class SearchService:
             if set(data.platforms) != set(pull.platforms):
                 raise HTTPException(422, "Source selection is fixed for a pull. Start a new pull to change sources.")
         else:
-            limits = {p: data.primary_credit_limit for p in data.platforms if p != "instagram"}
-            limits.update(comparison_allocations(data.platforms, data.comparison_limit))
+            # Legacy limit columns remain for database compatibility, but are not enforced.
             pull = CollectionPull(project_id=project_id, platforms=data.platforms,
-                comparison_limit=data.comparison_limit, platform_limits=limits, request_limit=data.request_limit)
+                comparison_limit=8, platform_limits={}, request_limit=20)
             self.db.add(pull)
             await self.db.flush()
         active = (await self.db.execute(select(SearchJob).where(SearchJob.pull_id == pull.id,
             SearchJob.status.in_(["pending", "queued", "running", "cancelling"])))).scalars().first()
         if active:
             raise HTTPException(409, "Wait for the current preview or collection to finish before revising this pull")
+        requested_post_count = data.requested_post_count or data.max_results_per_platform
+        platform_allocations = allocate_post_counts(data.platforms, requested_post_count, data.platform_percentages)
         if data.mode == "preview":
+            platform_allocations = {p: min(20, n) for p, n in platform_allocations.items()}
             cached = (await self.db.execute(select(SearchJob).where(
                 SearchJob.pull_id == pull.id, SearchJob.mode == "preview", SearchJob.fingerprint == fingerprint,
+                SearchJob.platform_allocations == platform_allocations,
+                SearchJob.platform_percentages == data.platform_percentages,
+                SearchJob.requested_post_count == requested_post_count,
                 SearchJob.status.in_(["completed", "completed_with_errors"]),
                 SearchJob.completed_at >= datetime.now(timezone.utc) - timedelta(seconds=FRESH_SECONDS)
             ).order_by(SearchJob.created_at.desc()))).scalars().first()
             if cached:
                 return await self._job_with_versions(cached)
-        requested_post_count = data.requested_post_count or data.max_results_per_platform
-        platform_allocations = allocate_post_counts(data.platforms, requested_post_count)
-        if data.mode == "preview":
-            platform_allocations = {p: min(20, n) for p, n in platform_allocations.items()}
         max_results_per_platform = max(platform_allocations.values())
         job = SearchJob(
             project_id=project_id, pull_id=pull.id, mode=data.mode, fingerprint=fingerprint,
@@ -136,6 +144,7 @@ class SearchService:
             date_from=data.date_from, date_to=data.date_to,
             max_results_per_platform=max_results_per_platform,
             requested_post_count=requested_post_count, platform_allocations=platform_allocations,
+            platform_percentages=data.platform_percentages,
             platform_states={platform: platform_state("pending") for platform in data.platforms},
         )
         self.db.add(job)
@@ -321,6 +330,7 @@ class SearchService:
             "max_results_per_platform": job.max_results_per_platform,
             "requested_post_count": job.requested_post_count,
             "platform_allocations": job.platform_allocations or {},
+            "platform_percentages": job.platform_percentages or {},
             "platform_states": job.platform_states or {},
             "total_posts_collected": job.total_posts_collected,
             "error_message": job.error_message,

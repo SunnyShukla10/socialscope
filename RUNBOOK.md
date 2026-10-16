@@ -82,7 +82,7 @@ try {
 }
 ```
 
-Also preserve .env privately/encrypted and note which build produced the backup. Do not commit backups. CSV exports alone omit users, budgets, and application state.
+Also preserve .env privately/encrypted and note which build produced the backup. Do not commit backups. CSV exports alone omit users, usage records, and application state.
 
 Restore rehearsal into a **new database** in this stack (use a fresh name if it exists):
 
@@ -109,4 +109,4 @@ For a native frontend, run `npm ci` from `frontend/`, set API_INTERNAL_URL befor
 
 ## Shared-account and hosting boundaries
 
-The local row-locked ledger controls each pull in one PostgreSQL database. It does not cap a provider account across other local installs or external tools. Xpoz credits are unknown; its safeguard counts outer SDK operations. Process-local rate limits do not coordinate multiple workers. Host binding is loopback only. Before public/shared hosting, follow [ROADMAP](docs/ROADMAP.md): accounts/project grants, centralized secrets and caps, distributed limits, TLS, monitoring, and tested recovery.
+The local row-locked ledger records provider usage for each pull without enforcing credit or per-pull request caps. Provider balances and billing remain external. Previews retain small operation limits. Process-local rate limits do not coordinate multiple workers. Host binding is loopback only. Before public/shared hosting, follow [ROADMAP](docs/ROADMAP.md): accounts/project grants, centralized secrets and caps, distributed limits, TLS, monitoring, and tested recovery.

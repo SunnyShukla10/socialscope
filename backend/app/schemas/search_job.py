@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, model_validator
-from typing import Literal, Optional, List
+from typing import Annotated, Literal, Optional, List
 import uuid
 from datetime import datetime, timezone
 
@@ -28,9 +28,6 @@ PlatformStatus = Literal[
 class SearchJobCreate(BaseModel):
     pull_id: Optional[uuid.UUID] = None
     mode: Literal["preview", "collection"] = "collection"
-    comparison_limit: int = Field(default=8, ge=5, le=8)
-    primary_credit_limit: int = Field(default=20, ge=1, le=100)
-    request_limit: int = Field(default=20, ge=1, le=100)
 
     @model_validator(mode="after")
     def validate_configuration(self):
@@ -38,6 +35,15 @@ class SearchJobCreate(BaseModel):
         allowed = {"twitter", "reddit", "youtube", "instagram", "tiktok", "facebook"}
         if not self.platforms or any(p not in allowed for p in self.platforms):
             raise ValueError("Select at least one supported source")
+        normalized = {("twitter" if p.lower() == "x" else p.lower()): v for p, v in self.platform_percentages.items()}
+        if len(normalized) != len(self.platform_percentages) or not set(normalized).issubset(self.platforms):
+            raise ValueError("Percentages must refer to distinct selected sources")
+        total = sum(normalized.values())
+        if total > 100 + 1e-8:
+            raise ValueError("Platform percentages cannot exceed 100%")
+        if len(normalized) == len(self.platforms) and abs(total - 100) > 1e-8:
+            raise ValueError("Percentages must total 100%, or leave a source on automatic")
+        self.platform_percentages = normalized
         for key in ("date_from", "date_to"):
             value = getattr(self, key)
             if value and value.tzinfo is None:
@@ -45,6 +51,8 @@ class SearchJobCreate(BaseModel):
         if self.date_from and self.date_to and self.date_from > self.date_to:
             raise ValueError("Start date must be on or before end date")
         return self
+
+    platform_percentages: dict[str, Annotated[float, Field(ge=0, le=100, allow_inf_nan=False)]] = Field(default_factory=dict)
 
     name: str = Field(min_length=1, max_length=255)
     platforms: List[str]
@@ -90,6 +98,7 @@ class PlatformCollectionStateOut(BaseModel):
 class SearchJobOut(BaseModel):
     pull_id: Optional[uuid.UUID] = None
     mode: str = "collection"
+    platform_percentages: dict[str, float] = Field(default_factory=dict)
     usage: dict = Field(default_factory=dict)
     preview_examples: list[dict] = Field(default_factory=list)
 

@@ -1,4 +1,4 @@
-"""Durable pull allowance, request ledger, response cache and run membership."""
+"""Pull lifecycle, usage records, response cache and run membership."""
 import uuid
 from sqlalchemy import String, Integer, DateTime, ForeignKey, CheckConstraint, func
 from sqlalchemy.dialects.postgresql import UUID, JSONB
@@ -12,6 +12,7 @@ class CollectionPull(Base):
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     project_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("projects.id", ondelete="CASCADE"), index=True)
     platforms: Mapped[list] = mapped_column(JSONB)
+    # Legacy allowance fields are retained for schema compatibility only.
     comparison_limit: Mapped[int] = mapped_column(Integer, default=8)
     platform_limits: Mapped[dict] = mapped_column(JSONB)
     request_limit: Mapped[int] = mapped_column(Integer, default=20)

@@ -1,8 +1,7 @@
-"""Credit reservations are serialized by a PostgreSQL pull row lock.
+"""Record provider usage and cache responses without enforcing credit caps.
 
-No automatic refunds: ambiguous failures and worker crashes retain their debit.
-SociaVault prices are endpoint-specific documented maxima (docs checked 2026-09-28).
-Xpoz operations have request safeguards only; its internal billing is unbounded here.
+Cancellation, post ceilings, and small preview samples still bound collection.
+Usage estimates are bookkeeping, not deductions from an application allowance.
 """
 from contextvars import ContextVar
 from dataclasses import dataclass, field
@@ -13,7 +12,6 @@ from sqlalchemy import select, func
 from sqlalchemy.dialects.postgresql import insert
 from app.models.collection_pull import CollectionPull, ProviderUsage, ProviderCache, RunPost
 
-COMPARISON = ("twitter", "reddit", "youtube")
 COSTS = {
     "/twitter/search": 1, "/reddit/search": 1, "/youtube/search": 1,
     "/tiktok/search/keyword": 1, "/google/search": 1, "/facebook/group/posts": 1, "/facebook/profile/posts": 1,
@@ -27,16 +25,6 @@ current_endpoint: ContextVar = ContextVar("provider_endpoint", default="sdk_oper
 
 class BudgetStopped(Exception):
     """Safe, displayable explanation. Never contains provider exception text."""
-
-
-def comparison_allocations(platforms, limit):
-    selected = [p for p in COMPARISON if p in platforms]
-    return {p: limit // len(selected) + (i < limit % len(selected))
-            for i, p in enumerate(selected)} if selected else {}
-
-
-def charged(row):
-    return max(row.reserved, row.reported or 0)
 
 
 @dataclass
@@ -55,17 +43,11 @@ class BudgetContext:
         raise BudgetStopped(reason)
 
     async def reserve(self, provider, endpoint):
-        if provider == "socialvault":
-            if endpoint not in COSTS:
-                self.stop("unsupported_cost: endpoint has no verified maximum cost")
-            cost = COSTS[endpoint]
-        elif provider == "xpoz" and self.platform not in COMPARISON:
-            cost = 0  # NOT a claim that Xpoz is free; credits remain unknown.
-        else:
-            self.stop("unsupported_cost: provider is not approved for this budget")
+        cost = COSTS.get(endpoint, 0) if provider == "socialvault" else 0
         async with self.sessions() as db:
-            pull = (await db.execute(select(CollectionPull).where(
-                CollectionPull.id == self.pull_id).with_for_update())).scalar_one()
+            # Serialize usage records with cancellation and pull lifecycle changes.
+            await db.execute(select(CollectionPull).where(
+                CollectionPull.id == self.pull_id).with_for_update())
             from app.models.search_job import SearchJob
             job = await db.get(SearchJob, self.job_id)
             if not job or job.status not in {"running", "queued", "pending"}:
@@ -75,21 +57,12 @@ class BudgetContext:
                 .where(SearchJob.pull_id == self.pull_id))).scalar_one()
             if accepted >= MAX_PULL_POSTS:
                 self.stop("post_limit: pull has reached 5000 unique posts including previews")
-            rows = (await db.execute(select(ProviderUsage).where(
-                ProviderUsage.pull_id == self.pull_id))).scalars().all()
-            if any(r.reported is not None and r.reported > r.reserved for r in rows):
-                self.stop("cost_schedule_changed: reported cost exceeded reservation; review pricing")
-            own = [r for r in rows if r.platform == self.platform]
-            if len(own) >= pull.request_limit:
-                self.stop("request_limit: pull request allowance exhausted")
-            if self.mode == "preview" and sum(r.job_id == self.job_id for r in own) >= PREVIEW_REQUESTS.get(self.platform, 1):
-                self.stop("preview_limit: small search preview allowance reached")
-            if self.platform in COMPARISON:
-                used = sum(charged(r) for r in rows if r.platform in COMPARISON)
-                if used + cost > pull.comparison_limit:
-                    self.stop("comparison_budget: shared comparison allowance exhausted")
-            if provider == "socialvault" and sum(charged(r) for r in own) + cost > pull.platform_limits.get(self.platform, 0):
-                self.stop("platform_budget: remaining allocation cannot fund this request")
+            if self.mode == "preview":
+                attempts = (await db.execute(select(func.count(ProviderUsage.id)).where(
+                    ProviderUsage.job_id == self.job_id,
+                    ProviderUsage.platform == self.platform))).scalar_one()
+                if attempts >= PREVIEW_REQUESTS.get(self.platform, 1):
+                    self.stop("preview_limit: small search preview sample reached")
             usage = ProviderUsage(pull_id=self.pull_id, job_id=self.job_id,
                 platform=self.platform, provider=provider, endpoint=endpoint, reserved=cost)
             db.add(usage)
@@ -151,12 +124,6 @@ async def usage_summary(db, pull):
             "estimated": sum(r.estimated or 0 for r in own if r.state == "estimated"),
             "reported": sum(r.reported or 0 for r in own),
             "unknown_requests": sum(r.state in {"reserved", "unknown"} for r in own),
-            "charged_allowance": sum(charged(r) for r in own),
-            "credit_limit": pull.platform_limits.get(platform),
-            "credits_bounded": platform != "instagram",
         }
-    used = sum(charged(r) for r in rows if r.platform in COMPARISON)
-    return {"pull_id": str(pull.id), "comparison_limit": pull.comparison_limit,
-        "comparison_remaining": max(0, pull.comparison_limit - used),
-        "request_limit_per_platform": pull.request_limit, "platforms": by_platform,
-        "scope": "This installation and pull only; shared provider account usage is not globally capped."}
+    return {"pull_id": str(pull.id), "credit_cap": None, "platforms": by_platform,
+        "scope": "Usage is recorded for this pull; SocialScope does not enforce a credit cap."}

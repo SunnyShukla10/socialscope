@@ -21,6 +21,7 @@ class SearchJob(Base):
     date_to: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=True)
     max_results_per_platform: Mapped[int] = mapped_column(Integer, nullable=False, default=500)
     requested_post_count: Mapped[int] = mapped_column(Integer, nullable=False, default=500)
+    platform_percentages: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     platform_allocations: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     platform_states: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     total_posts_collected: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

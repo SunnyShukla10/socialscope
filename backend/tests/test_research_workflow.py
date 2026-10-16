@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import select, func
 from app.models import Organization, Project, SearchJob, NormalizedPost
 from app.models.collection_pull import CollectionPull, ProviderUsage, RunPost
-from app.services.budget_service import BudgetContext, BudgetStopped, comparison_allocations, usage_summary, current_budget, current_endpoint
+from app.services.budget_service import BudgetContext, BudgetStopped, usage_summary, current_budget, current_endpoint
 from app.adapters.provider_limits import ProviderRequestController
 from app.services.post_service import PostService
 from app.workers.tasks import _persist_platform_posts
@@ -23,7 +23,7 @@ async def fixture_pull(sessions, platforms=None, limit=8, requests=20):
         project = Project(name="Transit", organization_id=org.id)
         db.add(project); await db.flush()
         pull = CollectionPull(project_id=project.id, platforms=platforms, comparison_limit=limit,
-            platform_limits={**{p:20 for p in platforms}, **comparison_allocations(platforms,limit)}, request_limit=requests)
+            platform_limits={p:20 for p in platforms}, request_limit=requests)
         db.add(pull); await db.flush()
         job = SearchJob(project_id=project.id, pull_id=pull.id, mode="collection", fingerprint="question",
             name="Run", status="running", platforms=platforms, requested_post_count=500,
@@ -31,40 +31,38 @@ async def fixture_pull(sessions, platforms=None, limit=8, requests=20):
         db.add(job); await db.commit()
         return org, project, pull, job
 
-@pytest.mark.parametrize("platforms,expected", [(["twitter","reddit","youtube"],{"twitter":3,"reddit":3,"youtube":2}),(["youtube"],{"youtube":8}),(["reddit","youtube"],{"reddit":4,"youtube":4}),([], {})])
-def test_predictable_shared_comparison_allocations(platforms, expected):
-    assert comparison_allocations(platforms,8)==expected
-
 @pytest.mark.asyncio
-async def test_combined_cap_accounts_for_previews_retries_and_abandoned_requests(sessions):
-    _,_,pull,job = await fixture_pull(sessions)
-    for platform, limit in comparison_allocations(pull.platforms,8).items():
-        preview = BudgetContext(sessions,pull.id,job.id,platform,"preview","query-a")
-        usage = await preview.reserve("socialvault",f"/{platform}/search")
-        await preview.settle(usage, unknown=True)
-        with pytest.raises(BudgetStopped, match="preview_limit"):
-            await preview.reserve("socialvault",f"/{platform}/search")
-        full = BudgetContext(sessions,pull.id,job.id,platform,"collection","revised-query")
-        for _ in range(limit-1):
-            await full.reserve("socialvault",f"/{platform}/search")
-        with pytest.raises(BudgetStopped):
-            await full.reserve("socialvault",f"/{platform}/search")
+@pytest.mark.parametrize("platform", ["twitter", "reddit", "youtube", "tiktok", "facebook", "instagram"])
+async def test_collection_ignores_legacy_credit_and_request_caps(sessions, platform):
+    _, _, pull, job = await fixture_pull(sessions, [platform], requests=1)
+    preview = BudgetContext(sessions, pull.id, job.id, platform, "preview", "query")
+    from app.services.budget_service import PREVIEW_REQUESTS
+    for _ in range(PREVIEW_REQUESTS.get(platform, 1)):
+        await preview.reserve("xpoz" if platform == "instagram" else "socialvault", "/twitter/search")
+    with pytest.raises(BudgetStopped, match="preview_limit"):
+        await preview.reserve("socialvault", "/twitter/search")
+    full = BudgetContext(sessions, pull.id, job.id, platform, "collection", "query")
+    for _ in range(25):
+        await full.reserve("xpoz" if platform == "instagram" else "socialvault", "/twitter/search")
     async with sessions() as db:
-        summary=await usage_summary(db,pull)
-        assert summary["comparison_remaining"]==0
-        assert sum(v["charged_allowance"] for v in summary["platforms"].values())==8
-        assert (await db.execute(select(func.count(ProviderUsage.id)))).scalar_one()==8
+        summary = await usage_summary(db, pull)
+        assert summary["credit_cap"] is None
+        assert summary["platforms"][platform]["requests"] == 25 + PREVIEW_REQUESTS.get(platform, 1)
+        assert "charged_allowance" not in summary["platforms"][platform]
+        assert "credit_limit" not in summary["platforms"][platform]
+
 
 @pytest.mark.asyncio
-async def test_unknown_endpoint_is_blocked_before_network(sessions):
-    _,_,pull,job=await fixture_pull(sessions)
-    ctx=BudgetContext(sessions,pull.id,job.id,"twitter","collection","q")
-    called=False
+async def test_unknown_endpoint_cost_does_not_block_collection(sessions):
+    _, _, pull, job = await fixture_pull(sessions)
+    ctx = BudgetContext(sessions, pull.id, job.id, "twitter", "collection", "q")
+    called = False
     async def network():
-        nonlocal called; called=True
-    with pytest.raises(BudgetStopped,match="unsupported_cost"):
-        await ctx.execute("socialvault","/new-expensive-route",network)
-    assert not called
+        nonlocal called
+        called = True
+        return httpx.Response(200, json={"credits_used": 5})
+    await ctx.execute("socialvault", "/new-route", network)
+    assert called
 
 @pytest.mark.asyncio
 async def test_retry_reserves_each_attempt_and_timeout_is_not_refunded(sessions):
@@ -85,16 +83,15 @@ async def test_retry_reserves_each_attempt_and_timeout_is_not_refunded(sessions)
         rows=(await db.execute(select(ProviderUsage))).scalars().all()
         assert [r.state for r in rows]==["unknown","reported"]
         assert sum(r.reserved for r in rows)==2
-        assert (await usage_summary(db,pull))["comparison_remaining"]==6
+        assert (await usage_summary(db,pull))["credit_cap"] is None
 
 @pytest.mark.asyncio
-async def test_reported_cost_change_stops_future_requests(sessions):
+async def test_reported_cost_change_does_not_stop_future_requests(sessions):
     _,_,pull,job=await fixture_pull(sessions,["twitter"])
     ctx=BudgetContext(sessions,pull.id,job.id,"twitter","collection","q")
     uid=await ctx.reserve("socialvault","/twitter/search")
     await ctx.settle(uid,httpx.Response(200,json={"credits_used":2}))
-    with pytest.raises(BudgetStopped,match="cost_schedule_changed"):
-        await ctx.reserve("socialvault","/twitter/search")
+    assert await ctx.reserve("socialvault","/twitter/search") is not None
 
 @pytest.mark.asyncio
 async def test_preview_cache_retains_payload_without_new_reservations(sessions):
@@ -144,7 +141,7 @@ async def test_direct_api_limits_and_preview_full_lifecycle(client, auth_headers
     p=(await client.post("/api/projects",headers=auth_headers,json={"name":"Research"})).json()
     path=f"/api/projects/{p['id']}/jobs"
     body={"name":"Preview","query":"transit","platforms":["x","reddit","youtube"],"requested_post_count":500,"mode":"preview"}
-    for key,value in [("requested_post_count",5001),("comparison_limit",9),("platforms",["unapproved"])]:
+    for key,value in [("requested_post_count",5001),("platforms",["unapproved"])]:
         assert (await client.post(path,headers=auth_headers,json={**body,key:value})).status_code==422
     response=await client.post(path,headers=auth_headers,json=body)
     assert response.status_code==201,response.text
@@ -181,9 +178,9 @@ async def test_real_postgres_concurrent_reservations():
             try: return await BudgetContext(sessions,pull.id,job.id,p,"collection","q").reserve("socialvault",f"/{p}/search")
             except BudgetStopped: return None
         results=await asyncio.gather(*(reserve(p) for p in pull.platforms for _ in range(12)))
-        assert sum(r is not None for r in results)==8
+        assert sum(r is not None for r in results)==36
         async with sessions() as db:
-            assert (await usage_summary(db,pull))["comparison_remaining"]==0
+            assert sum(v["requests"] for v in (await usage_summary(db,pull))["platforms"].values()) == 36
     finally:
         await engine.dispose()
         async with admin.begin() as conn: await conn.execute(DropSchema(schema,cascade=True))
@@ -218,3 +215,69 @@ async def test_active_collection_prevents_project_deletion(sessions):
             await ProjectService(db).delete_project(project.id, org.id)
         assert caught.value.status_code == 409
         assert await db.get(Project, project.id) is not None
+
+
+@pytest.mark.asyncio
+async def test_custom_distribution_survives_preview_resume_and_collection(client, auth_headers, sessions, monkeypatch):
+    monkeypatch.setattr("app.workers.tasks.run_collection_job.apply_async", lambda **kwargs: SimpleNamespace(id="mock-task"))
+    project = (await client.post("/api/projects", headers=auth_headers, json={"name": "Custom distribution"})).json()
+    path = f"/api/projects/{project['id']}/jobs"
+    body = {"name": "Custom", "query": "transit", "platforms": ["instagram", "tiktok", "facebook"],
+            "requested_post_count": 500, "platform_percentages": {"facebook": 50}, "mode": "preview"}
+    response = await client.post(path, headers=auth_headers, json=body)
+    assert response.status_code == 201, response.text
+    preview = response.json()
+    assert preview["platform_percentages"] == {"facebook": 50}
+    assert preview["platform_allocations"] == {"instagram": 20, "tiktok": 20, "facebook": 20}
+    async with sessions() as db:
+        stored = await db.get(SearchJob, uuid.UUID(preview["id"]))
+        stored.status = "completed"
+        stored.completed_at = datetime.now(timezone.utc)
+        await db.commit()
+    body["pull_id"] = preview["pull_id"]
+    reused = (await client.post(path, headers=auth_headers, json=body)).json()
+    assert reused["id"] == preview["id"]
+    body["platform_percentages"] = {"facebook": 100}
+    revised_response = await client.post(path, headers=auth_headers, json=body)
+    assert revised_response.status_code == 201, revised_response.text
+    revised = revised_response.json()
+    assert revised["id"] != preview["id"]
+    assert revised["platform_allocations"] == {"instagram": 0, "tiktok": 0, "facebook": 20}
+    async with sessions() as db:
+        stored = await db.get(SearchJob, uuid.UUID(revised["id"]))
+        stored.status = "completed"
+        stored.completed_at = datetime.now(timezone.utc)
+        await db.commit()
+    body.update(mode="collection", platform_percentages={"facebook": 50})
+    full_response = await client.post(path, headers=auth_headers, json=body)
+    assert full_response.status_code == 201, full_response.text
+    full = full_response.json()
+    assert full["platform_allocations"] == {"instagram": 78, "tiktok": 172, "facebook": 250}
+    runs = (await client.get(path, headers=auth_headers)).json()
+    assert next(r for r in runs if r["id"] == full["id"])["platform_percentages"] == {"facebook": 50}
+
+
+@pytest.mark.asyncio
+async def test_zero_allocation_never_calls_provider():
+    from app.services.platform_collection import PlatformCollectionRequest, _collect_one
+    class ForbiddenRouter:
+        async def search(self, **kwargs):
+            raise AssertionError("Zero-share platforms must not call the provider")
+    result = await _collect_one(ForbiddenRouter(), PlatformCollectionRequest("facebook", "transit", None, None, 0))
+    assert result.status == "completed"
+    assert result.posts == ()
+
+
+@pytest.mark.asyncio
+async def test_legacy_budget_inputs_are_ignored_and_not_exposed(client, auth_headers, monkeypatch):
+    monkeypatch.setattr("app.workers.tasks.run_collection_job.apply_async", lambda **kwargs: SimpleNamespace(id="mock-task"))
+    project = (await client.post("/api/projects", headers=auth_headers, json={"name": "No credit caps"})).json()
+    response = await client.post(f"/api/projects/{project['id']}/jobs", headers=auth_headers, json={
+        "name": "Collection", "query": "transit", "platforms": ["twitter"], "requested_post_count": 500,
+        "comparison_limit": 9999, "primary_credit_limit": 9999, "request_limit": 1,
+    })
+    assert response.status_code == 201, response.text
+    assert response.json()["usage"]["credit_cap"] is None
+    assert "comparison_remaining" not in response.json()["usage"]
+    sources = (await client.get("/api/sources", headers=auth_headers)).json()
+    assert "provider credits" in sources["account_limit_warning"]

@@ -45,15 +45,11 @@ This is a pilot handoff, not a production-readiness certification. The dated [va
 6. In Results, filter and follow original links. Exclude irrelevant posts reversibly; use Excluded scope to restore them. Analytics uses included posts.
 7. Export included, excluded, or all observations. CSV includes provider, collection time, run/query/requested-period provenance, scope, and limitations.
 
-## Allowances and important boundaries
+## Credit usage and collection boundaries
 
-X, Reddit, and YouTube are comparison sources. They have low allocation weights and **one combined 5-8-credit allowance, maximum eight**, across every preview, retry, query revision, and full collection in the pull. Eight with all three selected allocates 3/3/2 in X/Reddit/YouTube order. Unused shares do not automatically transfer. A full collection never refreshes the allowance. Start a new pull explicitly for a separate allowance; old/abandoned previews remain accounted for.
+SocialScope does not impose credit caps or per-pull request allowances. Collections use provider credits; start with a preview and a focused query, and check your provider balance before larger pulls. Existing pulls also use this behavior.
 
-TikTok/Facebook have configurable SociaVault credit and attempt safeguards (defaults 20 each). Instagram retains Xpoz SDK-operation safeguards and the existing maximum of 300 results per search. **Instagram credit usage is not a hard bounded amount** because internal SDK operations/billing are not fully observable here. Unknown/timeout charges are retained rather than assumed free.
-
-Each local installation enforces its own pull policy. Independent installs using the shared account do **not** enforce an aggregate account ceiling. Coordinate pilot use with the administrator. Selecting dates does not guarantee archive coverage, and a 5,000-post target does not promise 5,000 results. No live historical benchmark has been run. See the [evidence and benchmark proposal](docs/COLLECTION_FEASIBILITY.md).
-
-No recruitment actions, candidate lists, health-specific background classification, automatic advanced AI analysis, or third-party telemetry are active in the pilot. Existing core provider behavior is retained. The public-hosting controls in the roadmap have not been implemented.
+Previews remain small. Full collections stop at their post allocation, exhausted results, cancellation, or provider/pagination safeguards. A pull accepts up to 5,000 unique posts across its runs. Instagram retains its maximum of 300 results per search; actual billing depends on the provider. Usage records and response caching remain available internally.
 
 ## Learn, operate, and give feedback
 

@@ -85,8 +85,8 @@ Provider fixtures do not confirm current remote endpoints or yields. The fronten
 
 ## Supervised pilot smoke checklist
 
-With sufficient free disk space and a healthy Docker engine, start the independent stack and sign in using private setup credentials. Without spending, create a project, inspect source configuration, verify persistent tabs, and check empty Results/Analytics/Export states. Test invalid target 5001 and comparison budget 9 through the API: both should fail with HTTP 422.
+With sufficient free disk space and a healthy Docker engine, start the independent stack and sign in using private setup credentials. Without spending, create a project, inspect source configuration, verify persistent tabs, and check empty Results/Analytics/Export states. Test invalid target 5001 through the API: it should fail with HTTP 422. Verify full collections continue beyond legacy credit and request allowances using mocked providers.
 
-Only when a researcher deliberately starts approved ordinary pilot collection, use a small target/allowance. Confirm preview history, dates, examples, unchanged-preview reuse, revisions retaining pull ID, full collection retaining usage, cancellation, run filtering, deduplication, exclude/restore, included analytics, and CSV context. Compare ledger summaries with vendor records where available. Do not treat this checklist as permission for the separate live historical benchmark.
+Only when a researcher deliberately starts approved ordinary pilot collection, use a small post target. Confirm preview history, dates, examples, unchanged-preview reuse, revisions retaining pull ID, full collection retaining usage, cancellation, run filtering, deduplication, exclude/restore, included analytics, and CSV context. Compare ledger summaries with vendor records where available. Do not treat this checklist as permission for the separate live historical benchmark.
 
 Capture feedback with [docs/FEEDBACK.md](docs/FEEDBACK.md). The historical benchmark remains proposal-only; [docs/COLLECTION_FEASIBILITY.md](docs/COLLECTION_FEASIBILITY.md) explains what additional approval and evidence are needed.
