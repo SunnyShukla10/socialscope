@@ -6,6 +6,7 @@ from datetime import datetime
 from app.database import get_db
 from app.schemas.analytics import (
     AnalyticsSummaryResponse,
+    EngagementResponse,
     KPIOverview,
     PlatformResponse,
     VolumeResponse,
@@ -32,13 +33,31 @@ async def get_volume(
     project_id: uuid.UUID,
     date_from: Optional[datetime] = Query(None),
     date_to: Optional[datetime] = Query(None),
+    platform: Optional[str] = Query(None),
+    pull_id: Optional[uuid.UUID] = Query(None),
+    run_id: Optional[uuid.UUID] = Query(None),
     db: AsyncSession = Depends(get_db),
     current_user=Depends(AuthService.get_current_user),
 ):
     service = AnalyticsService(db)
     return await service.get_volume(
-        project_id, current_user.organization_id, date_from, date_to
+        project_id, current_user.organization_id, date_from, date_to, platform, pull_id, run_id
     )
+
+
+@router.get("/engagement", response_model=EngagementResponse)
+async def get_engagement(
+    project_id: uuid.UUID,
+    date_from: Optional[datetime] = Query(None),
+    date_to: Optional[datetime] = Query(None),
+    platform: Optional[str] = Query(None),
+    pull_id: Optional[uuid.UUID] = Query(None),
+    run_id: Optional[uuid.UUID] = Query(None),
+    db: AsyncSession = Depends(get_db),
+    current_user=Depends(AuthService.get_current_user),
+):
+    return await AnalyticsService(db).get_engagement(
+        project_id, current_user.organization_id, date_from, date_to, platform, pull_id, run_id)
 
 
 @router.get("/platforms", response_model=PlatformResponse)

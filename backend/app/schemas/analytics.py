@@ -22,6 +22,19 @@ class VolumeResponse(BaseModel):
     platforms: List[str]
 
 
+class EngagementDataPoint(BaseModel):
+    date: str
+    likes: int = 0
+    comments: int = 0
+    shares: int = 0
+    views: int = 0
+
+
+class EngagementResponse(BaseModel):
+    data: List[EngagementDataPoint]
+    metrics: List[str]
+
+
 class PlatformDataPoint(BaseModel):
     platform: str
     post_count: int

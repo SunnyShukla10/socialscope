@@ -99,3 +99,19 @@ Post shares do not guarantee result volume or credit cost.
 
 Existing installations need migration 013 (`alembic upgrade head`) before
 running the updated backend and workers; Compose's migrate service applies it.
+
+## Filtered time charts
+
+`GET /api/projects/{project_id}/analytics/volume` and the new
+`GET /api/projects/{project_id}/analytics/engagement` accept optional `platform`,
+`pull_id`, `run_id`, `date_from`, and `date_to` query parameters. Filters intersect.
+A pull includes all preview and full-run memberships; each included post counts
+once. Dates group posts by publication date, with missing days filled with zero.
+Posts without a publication date and excluded posts do not contribute.
+
+Engagement returns `data` with daily `likes`, `comments`, `shares`, and `views`,
+and `metrics` listing fields with recorded values above zero. Stored zero can
+mean missing provider data. These are cumulative counters observed at collection
+time, grouped by the publication date of their posts, not interaction dates.
+The analytics page shares platform/pull selectors between these two charts;
+other analytics sections retain their project-wide scope.

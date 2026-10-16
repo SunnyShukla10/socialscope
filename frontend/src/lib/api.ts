@@ -645,8 +645,36 @@ export async function getAnalyticsOverview(projectId: string): Promise<Analytics
   }
 }
 
-export async function getAnalyticsVolume(projectId: string): Promise<VolumeDataPoint[]> {
-  const response = await fetchApi<BackendVolumeResponse>(`/projects/${projectId}/analytics/volume`)
+export interface AnalyticsTimeFilters {
+  platform?: string
+  pull_id?: string
+  run_id?: string
+}
+export interface EngagementDataPoint {
+  date: string
+  likes: number
+  comments: number
+  shares: number
+  views: number
+}
+export type EngagementMetric = 'likes' | 'comments' | 'shares' | 'views'
+export interface EngagementResponse {
+  data: EngagementDataPoint[]
+  metrics: EngagementMetric[]
+}
+function analyticsTimeQuery(filters: AnalyticsTimeFilters): string {
+  const params = new URLSearchParams()
+  if (filters.platform) params.set('platform', filters.platform)
+  if (filters.pull_id) params.set('pull_id', filters.pull_id)
+  if (filters.run_id) params.set('run_id', filters.run_id)
+  return params.size ? `?${params}` : ''
+}
+export async function getAnalyticsEngagement(projectId: string, filters: AnalyticsTimeFilters = {}): Promise<EngagementResponse> {
+  return fetchApi(`/projects/${projectId}/analytics/engagement${analyticsTimeQuery(filters)}`)
+}
+
+export async function getAnalyticsVolume(projectId: string, filters: AnalyticsTimeFilters = {}): Promise<VolumeDataPoint[]> {
+  const response = await fetchApi<BackendVolumeResponse>(`/projects/${projectId}/analytics/volume${analyticsTimeQuery(filters)}`)
   const byDate = new Map<string, VolumeDataPoint>()
   const platforms = visiblePlatforms(response.platforms || [])
 

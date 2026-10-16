@@ -11,6 +11,8 @@ from collections import Counter, defaultdict
 from app.models.normalized_post import NormalizedPost
 from app.models.project import Project
 from app.schemas.analytics import (
+    EngagementDataPoint,
+    EngagementResponse,
     KPIOverview,
     VolumeResponse,
     VolumeDataPoint,
@@ -107,21 +109,41 @@ class AnalyticsService:
             total_engagement=total_engagement,
         )
 
+    def _time_conditions(self, project_id, date_from=None, date_to=None,
+                         platform=None, pull_id=None, run_id=None):
+        from app.models.collection_pull import RunPost
+        from app.models.search_job import SearchJob
+        conditions = [NormalizedPost.project_id == project_id, NormalizedPost.excluded.is_(False)]
+        if date_from:
+            conditions.append(NormalizedPost.published_at >= date_from)
+        if date_to:
+            conditions.append(NormalizedPost.published_at <= date_to)
+        if platform:
+            conditions.append(NormalizedPost.platform == ("twitter" if platform.lower() == "x" else platform.lower()))
+        if pull_id or run_id:
+            membership = select(RunPost.post_id).join(SearchJob, SearchJob.id == RunPost.job_id).where(
+                SearchJob.project_id == project_id)
+            if pull_id:
+                membership = membership.where(SearchJob.pull_id == pull_id)
+            if run_id:
+                membership = membership.where(SearchJob.id == run_id)
+            conditions.append(NormalizedPost.id.in_(membership))
+        return conditions
+
     async def get_volume(
         self,
         project_id: uuid.UUID,
         organization_id: uuid.UUID,
         date_from: Optional[datetime] = None,
         date_to: Optional[datetime] = None,
+        platform: Optional[str] = None,
+        pull_id: Optional[uuid.UUID] = None,
+        run_id: Optional[uuid.UUID] = None,
     ) -> VolumeResponse:
         if not await self._verify_project(project_id, organization_id):
             return VolumeResponse(data=[], platforms=[])
 
-        conditions = [NormalizedPost.project_id == project_id, NormalizedPost.excluded.is_(False)]
-        if date_from:
-            conditions.append(NormalizedPost.published_at >= date_from)
-        if date_to:
-            conditions.append(NormalizedPost.published_at <= date_to)
+        conditions = self._time_conditions(project_id, date_from, date_to, platform, pull_id, run_id)
 
         result = await self.db.execute(
             select(NormalizedPost.published_at, NormalizedPost.platform).where(
@@ -165,6 +187,38 @@ class AnalyticsService:
             for platform in platforms
         ]
         return VolumeResponse(data=data, platforms=platforms)
+
+    async def get_engagement(
+        self, project_id: uuid.UUID, organization_id: uuid.UUID,
+        date_from: Optional[datetime] = None, date_to: Optional[datetime] = None,
+        platform: Optional[str] = None, pull_id: Optional[uuid.UUID] = None,
+        run_id: Optional[uuid.UUID] = None,
+    ) -> EngagementResponse:
+        if not await self._verify_project(project_id, organization_id):
+            return EngagementResponse(data=[], metrics=[])
+        conditions = self._time_conditions(project_id, date_from, date_to, platform, pull_id, run_id)
+        result = await self.db.execute(select(
+            NormalizedPost.published_at, NormalizedPost.likes, NormalizedPost.comments,
+            NormalizedPost.shares, NormalizedPost.views).where(and_(*conditions)))
+        metrics = ("likes", "comments", "shares", "views")
+        by_date = {}
+        for published_at, *values in result.all():
+            if published_at is None:
+                continue
+            day = published_at.date()
+            bucket = by_date.setdefault(day, dict.fromkeys(metrics, 0))
+            for metric, value in zip(metrics, values):
+                bucket[metric] += max(0, int(value or 0))
+        if not by_date:
+            return EngagementResponse(data=[], metrics=[])
+        # A stored zero can also mean the provider did not supply the metric.
+        available = [metric for metric in metrics if any(row[metric] > 0 for row in by_date.values())]
+        start = date_from.date() if date_from else min(by_date)
+        end = date_to.date() if date_to else max(by_date)
+        data = [EngagementDataPoint(date=(day := start + timedelta(days=offset)).isoformat(),
+                                    **by_date.get(day, {}))
+                for offset in range(max(0, (end - start).days + 1))]
+        return EngagementResponse(data=data, metrics=available)
 
     async def get_platforms(
         self, project_id: uuid.UUID, organization_id: uuid.UUID

@@ -2,15 +2,14 @@
 
 import React, { useEffect, useState } from 'react'
 import {ErrorBox} from '@/components/research-ui'
+import { AnalyticsTimeCharts } from '@/components/analytics-time-charts'
 import { useParams } from 'next/navigation'
 import {
   getAnalyticsOverview,
-  getAnalyticsVolume,
   getAnalyticsPlatforms,
   getAnalyticsHashtags,
   getAnalyticsWordMap,
   type AnalyticsOverview,
-  type VolumeDataPoint,
   type PlatformDataPoint,
   type HashtagDataPoint,
   type WordMapResponse,
@@ -18,12 +17,10 @@ import {
 import { KpiCard } from '@/components/kpi-card'
 import { ProjectBackButton } from '@/components/project-back-button'
 import { SkeletonKPI } from '@/components/ui/skeleton'
-import { formatNumber, formatDateShort } from '@/lib/utils'
+import { formatNumber } from '@/lib/utils'
 import { CHART_COLORS, PLATFORMS } from '@/lib/constants'
 import { MessageSquare, Users, Hash, Heart, AlertCircle, Sparkles, RefreshCw } from 'lucide-react'
 import {
-  LineChart,
-  Line,
   BarChart,
   Bar,
   XAxis,
@@ -34,24 +31,6 @@ import {
   Cell,
 } from 'recharts'
 
-
-const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ color: string; name: string; value: number }>; label?: string }) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-surface border border-border rounded-lg shadow-lg px-4 py-3 text-xs">
-        <p className="font-semibold text-text mb-2">{label}</p>
-        {payload.map((entry) => (
-          <div key={entry.name} className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: entry.color }} />
-            <span className="text-text-muted">{entry.name}:</span>
-            <span className="font-medium text-text">{entry.value?.toLocaleString()}</span>
-          </div>
-        ))}
-      </div>
-    )
-  }
-  return null
-}
 
 function CoOccurrenceNetwork({ wordMap }: { wordMap: WordMapResponse }) {
   const edges = wordMap.edges.slice(0, 10)
@@ -163,7 +142,6 @@ export default function AnalyticsPage() {
   const id = params.id as string
 
   const [overview, setOverview] = useState<AnalyticsOverview | null>(null)
-  const [volume, setVolume] = useState<VolumeDataPoint[]>([])
   const [platforms, setPlatforms] = useState<PlatformDataPoint[]>([])
   const [hashtags, setHashtags] = useState<HashtagDataPoint[]>([])
   const [wordMap, setWordMap] = useState<WordMapResponse>({ nodes: [], edges: [] })
@@ -172,17 +150,15 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     async function load() {
-      const [overviewRes, volumeRes, platRes, hashRes, wordMapRes] = await Promise.allSettled([
+      const [overviewRes, platRes, hashRes, wordMapRes] = await Promise.allSettled([
         getAnalyticsOverview(id),
-        getAnalyticsVolume(id),
         getAnalyticsPlatforms(id),
         getAnalyticsHashtags(id),
         getAnalyticsWordMap(id),
       ])
 
-      setError([overviewRes,volumeRes,platRes,hashRes,wordMapRes].some(r => r.status === 'rejected') ? 'Some analytics could not load. Check the API connection and refresh this page.' : '')
+      setError([overviewRes,platRes,hashRes,wordMapRes].some(r => r.status === 'rejected') ? 'Some analytics could not load. Check the API connection and refresh this page.' : '')
       setOverview(overviewRes.status === 'fulfilled' ? overviewRes.value : null)
-      setVolume(volumeRes.status === 'fulfilled' ? volumeRes.value : [])
       setPlatforms(platRes.status === 'fulfilled' ? platRes.value : [])
       setHashtags(hashRes.status === 'fulfilled' ? hashRes.value : [])
       setWordMap(wordMapRes.status === 'fulfilled' ? wordMapRes.value : { nodes: [], edges: [] })
@@ -190,9 +166,6 @@ export default function AnalyticsPage() {
     }
     load()
   }, [id])
-
-  const activePlatforms = Array.from(new Set(volume.flatMap(point => Object.keys(point).filter(k => k !== "date"))))
-
 
   return (
     <div className="p-6 max-w-7xl space-y-6">
@@ -234,47 +207,7 @@ export default function AnalyticsPage() {
         </div>
       ) : null}
 
-      {/* Volume over time */}
-      <div className="bg-surface border border-border rounded-xl p-6">
-        <h3 className="text-sm font-semibold text-text mb-5">Volume Over Time</h3>
-        {loading ? (
-          <div className="h-64 bg-border/20 rounded animate-pulse" />
-        ) : (
-          <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={volume} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#D4D1CA" strokeOpacity={0.6} />
-              <XAxis
-                dataKey="date"
-                tickFormatter={(v) => formatDateShort(v)}
-                tick={{ fontSize: 11, fill: '#7A7974' }}
-                axisLine={{ stroke: '#D4D1CA' }}
-                tickLine={false}
-                interval="preserveStartEnd"
-              />
-              <YAxis
-                tick={{ fontSize: 11, fill: '#7A7974' }}
-                axisLine={false}
-                tickLine={false}
-                tickFormatter={(v) => formatNumber(v)}
-                width={45}
-              />
-              <Tooltip content={<CustomTooltip />} />
-              {activePlatforms.map((p, i) => (
-                <Line
-                  key={p}
-                  type="monotone"
-                  dataKey={p}
-                  stroke={PLATFORMS[p as keyof typeof PLATFORMS]?.color || CHART_COLORS[i % CHART_COLORS.length]}
-                  strokeWidth={2}
-                  dot={false}
-                  activeDot={{ r: 4 }}
-                  name={p}
-                />
-              ))}
-            </LineChart>
-          </ResponsiveContainer>
-        )}
-      </div>
+      <AnalyticsTimeCharts projectId={id} />
 
       {/* Platform distribution */}
       <div className="bg-surface border border-border rounded-xl p-6">
