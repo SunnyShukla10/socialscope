@@ -139,6 +139,8 @@ class SearchService:
                 return await self._job_with_versions(cached)
         max_results_per_platform = max(platform_allocations.values())
         job = SearchJob(
+            initiated_by=actor.id if actor else None,
+            initiator_label=actor.email if actor else None,
             project_id=project_id, pull_id=pull.id, mode=data.mode, fingerprint=fingerprint,
             name=data.name, status="pending", platforms=data.platforms,
             date_from=data.date_from, date_to=data.date_to,
@@ -159,7 +161,7 @@ class SearchService:
             target_type="search_job",
             target_id=str(job.id),
             target_label=project.name,
-            metadata={"platforms": data.platforms, "requested_post_count": requested_post_count, "platform_allocations": platform_allocations},
+            metadata={"outcome": "submitted", "mode": data.mode, "platforms": data.platforms, "requested_post_count": requested_post_count, "platform_allocations": platform_allocations},
         )
 
         # Create initial query version
@@ -187,6 +189,7 @@ class SearchService:
             logger.error("Collection dispatch failed: job_id=%s type=%s", job.id, type(exc).__name__)
             job.status = "failed"
             job.error_message = "Queue unavailable. Check Redis and the collection worker, then start a new pull."
+            await ActivityService(self.db).collection_outcome(job)
             await self.db.commit()
         await self.db.refresh(job)
 

@@ -29,6 +29,10 @@ def make_job(
 ):
     return SimpleNamespace(
         id=uuid.uuid4(),
+        project_id=uuid.uuid4(),
+        initiated_by=None,
+        initiator_label=None,
+        mode="collection",
         status=status,
         platforms=platforms or ["twitter", "tiktok"],
         platform_states=platform_states
@@ -65,6 +69,19 @@ class RecordingDatabase:
         self.results.extend(ScalarResult(count) for count in post_counts)
         self.statements = []
         self.commits = 0
+        self.events = []
+
+    async def get(self, model, identifier):
+        from app.models.project import Project
+        if model is Project:
+            return SimpleNamespace(id=identifier, organization_id=uuid.uuid4(), name="Recovered project")
+        return None
+
+    def add(self, event):
+        self.events.append(event)
+
+    async def flush(self):
+        pass
 
     async def execute(self, statement):
         self.statements.append(statement)
@@ -179,6 +196,8 @@ async def test_active_celery_job_is_not_recovered_even_when_stale():
     assert abandoned_job.status == "completed_with_errors"
     assert abandoned_job.total_posts_collected == 8
     assert database.commits == 1
+    assert len(database.events) == 1
+    assert database.events[0].action == "collection_completed_with_errors"
     assert len(database.statements) == 2
 
 

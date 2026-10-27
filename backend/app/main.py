@@ -23,6 +23,7 @@ from app.routes import (
     dashboard,
     admin,
     query_limits,
+    feedback,
 )
 from app.services.query_validation import QueryValidationError
 
@@ -73,6 +74,7 @@ app.include_router(exports.router)
 app.include_router(dashboard.router)
 app.include_router(admin.router)
 app.include_router(query_limits.router)
+app.include_router(feedback.router)
 
 
 # ─── Root ─────────────────────────────────────────────────────────────────────

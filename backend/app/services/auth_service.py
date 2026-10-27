@@ -5,7 +5,7 @@ from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from app.config import settings
 from app.database import get_db
 from app.models.user import User
@@ -18,7 +18,7 @@ class AuthService:
         self.db = db
 
     async def authenticate(self, email: str, password: str) -> Optional[User]:
-        result = await self.db.execute(select(User).where(User.email == email))
+        result = await self.db.execute(select(User).where(func.lower(User.email) == email.strip().lower()))
         user = result.scalar_one_or_none()
         if not user or not user.verify_password(password):
             return None
@@ -59,6 +59,6 @@ class AuthService:
 
         result = await db.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
-        if user is None or not user.is_active:
+        if user is None or not user.is_active or payload.get("ver", 0) != user.token_version:
             raise credentials_exception
         return user

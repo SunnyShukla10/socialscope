@@ -90,3 +90,32 @@ With sufficient free disk space and a healthy Docker engine, start the independe
 Only when a researcher deliberately starts approved ordinary pilot collection, use a small post target. Confirm preview history, dates, examples, unchanged-preview reuse, revisions retaining pull ID, full collection retaining usage, cancellation, run filtering, deduplication, exclude/restore, included analytics, and CSV context. Compare ledger summaries with vendor records where available. Do not treat this checklist as permission for the separate live historical benchmark.
 
 Capture feedback with [docs/FEEDBACK.md](docs/FEEDBACK.md). The historical benchmark remains proposal-only; [docs/COLLECTION_FEASIBILITY.md](docs/COLLECTION_FEASIBILITY.md) explains what additional approval and evidence are needed.
+
+## Account, admin, and feedback checks ? 2026-10-26
+
+Focused validation for this change used isolated in-memory SQLite accounts and mocked queue submission. No real pilot accounts, live provider operations, production database changes, or deployment were performed.
+
+- **76 passed, 1 skipped** across `test_pilot_accounts.py`, `test_auth.py`, `test_projects.py`, `test_exclusion.py`, `test_abandoned_job_recovery.py`, `test_collection_lifecycle.py`, `test_collection_cancellation.py`, `test_research_workflow.py`, and `test_export_provenance.py` (18.26 seconds). The existing PostgreSQL-only row-lock test was skipped.
+- New cases cover member creation/login, duplicate emails, role/organization injection rejection, admin permissions, cross-organization isolation, disabled/re-enabled token revocation, final-admin protection, create-only seed preservation, password-reset revocation, feedback validation/persistence/review, activity pagination/filtering, history after project deletion, collection initiator/outcome attribution, abandoned legacy outcomes, queue dispatch failure, exclusion/restoration, and download-request audit events.
+- TypeScript `--noEmit --incremental false` passed. This is a type check, not a Next.js build or browser test.
+- All six existing lightweight frontend test scripts passed: post distribution, query validation, collection progress, results refresh, cancellation, and session connectivity.
+- Alembic generated SQL for **013 ? 014** successfully with a placeholder database URL. SQL generation does not execute the migration or establish PostgreSQL runtime correctness.
+- `git diff --check` passed at final review.
+
+No `npm build`, `npm run build`, `next build`, dependency installation, full backend suite, or live load test was run, keeping checks light for this computer. Existing JWT/dateutil deprecation warnings remain unrelated to this change.
+
+### Reproduce focused backend checks
+
+From `backend/`, using an environment with the existing requirements installed:
+
+```bash
+python -m pytest tests/test_pilot_accounts.py tests/test_auth.py tests/test_projects.py tests/test_exclusion.py tests/test_abandoned_job_recovery.py tests/test_collection_lifecycle.py tests/test_collection_cancellation.py tests/test_research_workflow.py tests/test_export_provenance.py -q
+```
+
+This machine used the existing ignored `.test-deps` on PYTHONPATH for SQLite/Alembic dependencies; no packages were installed.
+
+### Remaining acceptance checks on the pilot host
+
+Apply migration 014 to a backed-up disposable PostgreSQL database before the live deployment. Verify the last-admin guard under simultaneous requests on PostgreSQL, where row locking is enforced. Check two organizations with separate admin/member accounts and confirm project and report isolation. Then manually exercise Admin ? Users, per-person activity, report submission/retry, Reviewed toggles, and pagination in browsers. Confirm keyboard navigation and mobile reporting. Run a real worker against mocked providers to verify terminal audit writes through broker delivery; no paid provider test is required for this feature. Validate encrypted hosted access, backup/restore, restart behavior, and expected concurrent usage separately.
+
+These host/browser checks remain pending. This release prepares future participants; it does not certify production hosting or capacity.

@@ -69,7 +69,7 @@ class ExclusionRequest(BaseModel):
 @router.patch("/{post_id}/exclusion")
 async def set_exclusion(project_id: uuid.UUID, post_id: uuid.UUID, body: ExclusionRequest,
     db: AsyncSession = Depends(get_db), current_user=Depends(AuthService.get_current_user)):
-    changed = await PostService(db).set_exclusion(project_id, post_id, current_user.organization_id, body.excluded)
+    changed = await PostService(db).set_exclusion(project_id, post_id, current_user.organization_id, body.excluded, actor=current_user)
     if not changed:
         raise HTTPException(404, "Post not found")
     return {"id": post_id, "excluded": body.excluded}

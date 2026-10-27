@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.schemas.auth import LoginRequest, TokenResponse, UserOut
 from app.services.auth_service import AuthService
+from app.services.activity_service import ActivityService
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -17,7 +18,9 @@ async def login(request: LoginRequest, db: AsyncSession = Depends(get_db)):
             detail="Invalid email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    token = auth_service.create_access_token({"sub": str(user.id)})
+    token = auth_service.create_access_token({"sub": str(user.id), "ver": user.token_version})
+    await ActivityService(db).log(organization_id=user.organization_id, actor=user,
+        action="login_succeeded", target_type="user", target_id=str(user.id))
     return TokenResponse(access_token=token)
 
 

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from celery.utils.log import get_task_logger
 
 from app.services.collection_status import collection_terminal_status
+from app.services.activity_service import ActivityService
 from app.services.collection_lifecycle import (
     can_transition_job_status,
     finalize_platform_cancellation,
@@ -414,6 +415,7 @@ def run_collection_job(self, job_id: str):
                         cancelled_at=cancelled_at,
                     )
                     job.last_progress_at = cancelled_at
+                    await ActivityService(db).collection_outcome(job)
                     await db.commit()
                     return {
                         "status": "cancelled",
@@ -430,6 +432,7 @@ def run_collection_job(self, job_id: str):
                 if not job.pull_id or not 100 <= job.requested_post_count <= 5000:
                     job.status = "failed"
                     job.error_message = "Missing pull allowance or invalid post target; create a new collection."
+                    await ActivityService(db).collection_outcome(job)
                     await db.commit()
                     return {"status": "failed"}
                 platforms = tuple(job.platforms)
@@ -660,6 +663,7 @@ def run_collection_job(self, job_id: str):
                     job.completed_at = terminal_at
                     job.error_message = "; ".join(all_errors) if all_errors else None
                     job.last_progress_at = job.completed_at
+                await ActivityService(db).collection_outcome(job)
                 await db.commit()
 
             logger.info(
@@ -693,6 +697,7 @@ def run_collection_job(self, job_id: str):
                     job.completed_at = datetime.now(timezone.utc)
                     job.last_progress_at = job.completed_at
                     job.error_message = f"Collection task failed ({type(exc).__name__})"
+                    await ActivityService(db).collection_outcome(job)
                     await db.commit()
                     marked_failed = True
             await engine.dispose()

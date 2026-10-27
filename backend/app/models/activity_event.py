@@ -1,4 +1,4 @@
-from sqlalchemy import DateTime, ForeignKey, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, String, Text, func, Index
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 import uuid
@@ -8,6 +8,10 @@ from app.models.base import Base
 
 class ActivityEvent(Base):
     __tablename__ = "activity_events"
+    __table_args__ = (
+        Index("ix_activity_org_time", "organization_id", "created_at"),
+        Index("ix_activity_org_actor_time", "organization_id", "actor_user_id", "created_at"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4

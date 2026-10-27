@@ -120,6 +120,10 @@ async def download_export(
         project_id,
         export_id,
     )
+    from app.services.activity_service import ActivityService
+    await ActivityService(db).log(organization_id=current_user.organization_id, actor=current_user,
+        project_id=project_id, action="export_download_requested", target_type="export",
+        target_id=str(export_id), metadata={"outcome": "requested"})
     return FileResponse(
         path=export_job.file_path,
         media_type="text/csv",

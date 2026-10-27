@@ -2,7 +2,15 @@
 
 SocialScope supports topic/question -> optional dates -> source/query selection -> search preview -> bounded collection -> review/exclude -> descriptive analysis -> CSV export. It is an independent adaptation of SocialPulse, with a separate database, volumes, ports, and browser session key.
 
-## Start locally
+## Participants (accounts will be added later)
+
+Participants use the access link and individual account supplied by their administrator. They do not install Docker, configure provider keys, or run setup. Ask the administrator for a password reset if needed. Users in the same organization share its projects; individual logins identify actions rather than create private projects.
+
+Use **Feedback / Report an issue** in the sidebar to send a short message. Your account, page path, and timestamp accompany the message. Administrators can review reports and filter activity by person.
+
+No participants have been provisioned by this change. Public signup, invitations, and email recovery are not implemented. Shared encrypted hosting remains a separate operator task.
+
+## Operator: start locally
 
 Install Docker Desktop (Linux containers/Compose) and Python 3 for the setup helper. Keep several GB free for dependency downloads, images, and builds. From this `socialscope` directory:
 
@@ -19,7 +27,7 @@ docker compose logs --tail 50 migrate seed
 python scripts/check-connectivity.py
 ```
 
-Open **http://localhost:3002**. Sign in with `LOCAL_ADMIN_EMAIL` and `LOCAL_ADMIN_PASSWORD` from your .env. Migrations and seed run automatically. The default email is `admin@socialscope.local`; setup generates the password. The API reference is http://localhost:8002/api/docs. Source availability and version/build appear on the dashboard. Missing keys permit browsing/setup but produce explicit unavailable collection outcomes.
+Open **http://localhost:3002**. Sign in with `LOCAL_ADMIN_EMAIL` and `LOCAL_ADMIN_PASSWORD` from your .env. Migrations and seed run automatically. Seed creates a missing initial account only; existing passwords, roles, names, and organizations are preserved. The default email is `admin@socialscope.local`; setup generates the password. The API reference is http://localhost:8002/api/docs. Source availability and version/build appear on the dashboard. Missing keys permit browsing/setup but produce explicit unavailable collection outcomes.
 
 Wait for `migrate` and `seed` to finish with exit code 0 before signing in; those one-shot containers are expected to exit. The connectivity helper checks HTTP reachability, not the full dependency-health response. Follow the health checks in [RUNBOOK](RUNBOOK.md).
 
@@ -31,7 +39,7 @@ If startup fails, use [RUNBOOK](RUNBOOK.md). Current environment validation and 
 
 Share the application source, `docker-compose.yml`, Dockerfiles, `.env.example`, scripts, and documentation. Do not include `.env`, provider keys, login passwords, database backups, exports, validation artifacts, or `node_modules`. If sending an archive, exclude ignored files explicitly; Git ignore rules do not protect a manually zipped folder. The recipient should run setup to generate their own local login/signing secret, then obtain the shared provider credentials privately from the administrator.
 
-The current `.gitignore` excludes `docs/`. For a Git-based handoff, include the intended documentation explicitly or provide it as a separate bundle. Keep that bundle under `docs/` beside these root guides so their links work.
+The intended Markdown guides under `docs/` are allowlisted in `.gitignore`; other documentation artifacts and manifests remain ignored. Review files before including them in a handoff.
 
 This is a pilot handoff, not a production-readiness certification. The dated [validation record](TESTING_GUIDE.md) identifies the remaining Docker/PostgreSQL acceptance checks.
 
@@ -57,6 +65,10 @@ Previews remain small. Full collections stop at their post allocation, exhausted
 - [Future improvement guide](docs/ROADMAP.md): feedback priorities, shared VM preparation, multiple-researcher controls, and justified scaling.
 - [Collection feasibility and offline benchmark](docs/COLLECTION_FEASIBILITY.md): official evidence, code behavior, unknowns, and a no-spend planning/analyzer tool.
 - [Runbook](RUNBOOK.md), [API reference](API.md), and [testing/validation](TESTING_GUIDE.md).
-- [Feedback template](docs/FEEDBACK.md): include task, expected/actual behavior, version/build, and run ID. Remove credentials and sensitive research text.
+- [Feedback guide](docs/FEEDBACK.md): use the in-app form and omit credentials or sensitive research data.
 
 After the first supervised pilot sessions, prioritize setup friction, query relevance, useful historical coverage, and interpretability of outcomes. Approve a separate bounded live benchmark before spending credits to investigate larger historical yields.
+
+## Operator: prepare accounts for later
+
+After applying migration 014, use **Admin ? Users** to create members in your organization when the pilot is ready. Do not share the initial admin login. Admins can enable/disable users and review activity and reports. The last active admin cannot be disabled. Password resets use the interactive operator tool described in [RUNBOOK.md](RUNBOOK.md); passwords are not command arguments. There is no public registration.

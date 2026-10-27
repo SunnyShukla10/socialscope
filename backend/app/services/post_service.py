@@ -112,6 +112,7 @@ class PostService:
         post_id: uuid.UUID,
         organization_id: uuid.UUID,
         excluded: bool,
+        actor=None,
     ) -> bool:
         result = await self.db.execute(
             select(NormalizedPost)
@@ -125,7 +126,13 @@ class PostService:
         post = result.scalar_one_or_none()
         if not post:
             return False
+        if post.excluded == excluded:
+            return True
         post.excluded = excluded
+        from app.services.activity_service import ActivityService
+        await ActivityService(self.db).log(organization_id=organization_id, actor=actor,
+            project_id=project_id, action="post_excluded" if excluded else "post_restored",
+            target_type="post", target_id=str(post_id))
         await self.db.flush()
         logger.info("Updated exclusion: project_id=%s post_id=%s", project_id, post_id)
         return True

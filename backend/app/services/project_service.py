@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from pathlib import Path
-from sqlalchemy import select, func, delete
+from sqlalchemy import select, func, delete, update
 from typing import List, Optional
 import uuid
 import logging
@@ -129,7 +129,7 @@ class ProjectService:
         return p
 
     async def delete_project(
-        self, project_id: uuid.UUID, organization_id: uuid.UUID
+        self, project_id: uuid.UUID, organization_id: uuid.UUID, actor: User | None = None
     ) -> bool:
         result = await self.db.execute(
             select(Project).where(
@@ -160,7 +160,12 @@ class ProjectService:
             except OSError:
                 logger.warning("Failed to remove export file during project delete: %s", file_path)
 
-        await self.db.execute(delete(ActivityEvent).where(ActivityEvent.project_id == project_id))
+        # Preserve labels and history after project deletion.
+        await self.db.execute(update(ActivityEvent).where(ActivityEvent.project_id == project_id,
+            ActivityEvent.target_label.is_(None)).values(target_label=project.name))
+        await ActivityService(self.db).log(organization_id=organization_id, actor=actor,
+            action="project_deleted", target_type="project", target_id=str(project_id), target_label=project.name)
+        await self.db.execute(update(ActivityEvent).where(ActivityEvent.project_id == project_id).values(project_id=None))
         await self.db.execute(
             delete(Project).where(
                 Project.id == project_id,

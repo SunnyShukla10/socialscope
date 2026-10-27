@@ -26,4 +26,5 @@ __all__ = [
     "AnalyticsSummary",
 ]
 from app.models.activity_event import ActivityEvent
+from app.models.feedback import Feedback
 from app.models.collection_pull import CollectionPull, ProviderUsage, ProviderCache, RunPost

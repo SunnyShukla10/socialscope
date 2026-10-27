@@ -25,7 +25,7 @@ Invoke-RestMethod http://127.0.0.1:8002/api/health
 
 Expected fields are `status: ok`, `database: true`, and `redis: true`. The current endpoint returns HTTP 200 even when status is `degraded`. Both the connectivity script and backend container health probe can therefore pass while a dependency is unavailable; inspect the response fields and worker logs before accepting the installation. None of these checks contacts a social provider.
 
-Dashboard displays configured-source booleans and version/build. API root reports service version; `/api/sources` includes BUILD_ID. Seed uses LOCAL_ADMIN_EMAIL/PASSWORD; re-running it resets that seeded account's hash to the configured password. Provider keys stay server-side.
+Dashboard displays configured-source booleans and version/build. API root reports service version; `/api/sources` includes BUILD_ID. Seed uses LOCAL_ADMIN_EMAIL/PASSWORD; re-running it preserves existing account details. Use the interactive operator tool for password resets. Provider keys stay server-side.
 
 ```powershell
 docker compose logs --tail 100 migrate seed backend worker scheduler
@@ -44,7 +44,7 @@ docker compose down
 | Docker engine error / 500 / not reachable | Start Docker Desktop in Linux-container mode; check free disk and engine health before retrying this stack |
 | Build runs out of space | Free several GB outside source/application data; retry a clean build; do not delete databases or shared Docker storage |
 | Login fails | Wait for seed to finish; inspect seed logs; use the private .env login values; verify web/API proxy connectivity |
-| New password in .env has no effect | Run `docker compose run --rm seed` deliberately to apply it; seed resets the configured admin password |
+| New password in .env has no effect | Expected for existing accounts. Use `docker compose exec backend python -m app.manage_users reset-password`; seed does not reset passwords |
 | 401 during work | Sign in again; SocialScope uses its own browser token key |
 | Missing source key | Edit .env privately, then recreate backend/worker/scheduler with `docker compose up -d --force-recreate backend worker scheduler` |
 | Queued run stays queued | Check Redis and worker logs/queue subscription; commit-to-publish crash gap is not automatically repaired; don't replay paid work blindly |
@@ -109,4 +109,61 @@ For a native frontend, run `npm ci` from `frontend/`, set API_INTERNAL_URL befor
 
 ## Shared-account and hosting boundaries
 
-The local row-locked ledger records provider usage for each pull without enforcing credit or per-pull request caps. Provider balances and billing remain external. Previews retain small operation limits. Process-local rate limits do not coordinate multiple workers. Host binding is loopback only. Before public/shared hosting, follow [ROADMAP](docs/ROADMAP.md): accounts/project grants, centralized secrets and caps, distributed limits, TLS, monitoring, and tested recovery.
+The local row-locked ledger records provider usage for each pull without enforcing credit or per-pull request caps. Provider balances and billing remain external. Previews retain small operation limits. Process-local rate limits do not coordinate multiple workers. Host binding is loopback only. Before public/shared hosting, follow [ROADMAP](docs/ROADMAP.md): validate organization isolation, centralized secrets and account limits, distributed rate limits, TLS, monitoring, and tested recovery. Individual accounts are prepared; project grants are needed only if projects must be private within a team.
+
+## Future multi-user pilot: accounts and admin oversight (2026-10-26)
+
+This release prepares accounts and oversight; it does not add participants or change hosting. Back up the database before applying migrations. Migration **014** adds feedback, collection initiators, session versions, and activity indexes without deleting existing data. Deploy the matching API and worker code after applying it. A downgrade removes the new records/fields; restore a verified backup if rolling back requires retaining them.
+
+The existing migration service applies `alembic upgrade head` at deployment. This implementation has not applied migrations to your live database. Use the established deployment procedure when ready; no deployment is part of this change.
+
+### Initial administrator
+
+Setup generates credentials in private `.env`. Seed creates the configured account only if missing and preserves existing account details on reruns. Changing `LOCAL_ADMIN_PASSWORD` no longer changes an existing password. New seed accounts require a password of at least 12 characters and at most 72 UTF-8 bytes; the setup-generated password meets this rule. Existing accounts are not forced to change their passwords.
+
+For explicit provisioning, run from the backend directory in a configured operator environment:
+
+```bash
+python -m app.manage_users bootstrap
+```
+
+Or, for an already running configured container:
+
+```bash
+docker compose exec backend python -m app.manage_users bootstrap
+```
+
+The command prompts for email, organization slug/name, administrator name, and a hidden password with confirmation. No password goes in the command line. An existing email is left unchanged, including a member or disabled account; this is not a promotion/reactivation command. Do not run it just to validate the installation.
+
+### Add members later
+
+1. Log in with your individual admin account and open **Admin ? Users**.
+2. Create a member with their name, email, and a unique password. Share credentials privately through an encrypted channel. No invitation is sent.
+3. Members are assigned to the admin's organization by the server and share that organization's projects. Separate organizations cannot see each other's admin records or projects. There are no per-user project grants.
+4. Click a person's email, or select them in the activity filter, to inspect their recorded actions. The filter offers the current Users page; navigate Users pages to find another person.
+5. Disable access when required. Disabling revokes existing tokens; re-enabling requires a fresh login. The final active admin is protected, including concurrent changes serialized by an organization row lock on PostgreSQL.
+
+### Password reset
+
+Run `python -m app.manage_users reset-password` in the backend directory, or:
+
+```bash
+docker compose exec backend python -m app.manage_users reset-password
+```
+
+Enter the email and hidden new password twice. Previous tokens are invalidated. Account role and active status stay unchanged. There is no email recovery or password in arguments, output, or application activity records.
+
+### Activity and feedback
+
+Activity includes logins, account changes, project creation/deletion, collection submission and terminal outcomes, post exclusion/restoration, CSV generation, and export download requests. It records meaningful actions, not every page view or proof of online presence. Download requests are not proof of completed file transfer. Legacy collection initiators remain System / Unknown; they are not reconstructed by guessing. New background outcomes retain the submitting person's identity. Project deletion preserves activity labels and history. Previously deleted history cannot be recovered by this change.
+
+Reports use **Feedback / Report an issue** in the sidebar. Admins see their organization's submissions under **Feedback & issues** and can toggle **Reviewed**. Refresh reloads the records; lists are paginated. No attachments, email notifications, comments, or public issue tracker are included.
+
+### Troubleshooting and remaining hosting blockers
+
+- A missing-table/column error after updating code usually indicates migration 014 has not been applied.
+- A 403 on admin routes means the account is not an active administrator; members cannot grant themselves access.
+- A 409 when disabling the final active admin is intentional. Provision a second authorized admin through the operator process if needed.
+- A reset or disable invalidates tokens; sign in again after access is restored.
+- A failed feedback request retains its message in the form. Do not retry after a confirmed success.
+- Shared VM exposure still needs encrypted access, production configuration, backups/restores, monitoring, provider-account rate coordination, and live multi-user validation. None was changed or certified here.

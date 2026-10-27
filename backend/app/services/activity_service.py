@@ -40,11 +40,37 @@ class ActivityService:
         await self.db.flush()
         return event
 
-    async def latest(self, organization_id: uuid.UUID, limit: int = 100) -> list[ActivityEvent]:
+    async def latest(self, organization_id: uuid.UUID, limit: int = 100,
+                     offset: int = 0, user_id: uuid.UUID | None = None) -> list[ActivityEvent]:
+        conditions = [ActivityEvent.organization_id == organization_id]
+        if user_id is not None:
+            conditions.append(ActivityEvent.actor_user_id == user_id)
         result = await self.db.execute(
             select(ActivityEvent)
-            .where(ActivityEvent.organization_id == organization_id)
-            .order_by(ActivityEvent.created_at.desc())
+            .where(*conditions)
+            .order_by(ActivityEvent.created_at.desc(), ActivityEvent.id.desc())
+            .offset(offset)
             .limit(limit)
         )
         return list(result.scalars().all())
+
+    async def collection_outcome(self, job):
+        """Record one terminal outcome per locked job, in the outcome transaction."""
+        from app.models.project import Project
+        from app.services.collection_lifecycle import TERMINAL_JOB_STATUSES
+        if job.status not in TERMINAL_JOB_STATUSES:
+            return
+        event_id = uuid.uuid5(uuid.NAMESPACE_URL, f"socialscope:collection-outcome:{job.id}")
+        if await self.db.get(ActivityEvent, event_id):
+            return
+        project = await self.db.get(Project, job.project_id)
+        if not project:
+            return
+        self.db.add(ActivityEvent(
+            id=event_id, organization_id=project.organization_id, project_id=project.id,
+            actor_user_id=job.initiated_by, actor_label=job.initiator_label or "System / Unknown",
+            action=f"collection_{job.status}", target_type="search_job",
+            target_id=str(job.id), target_label=project.name,
+            extra_metadata={"outcome": job.status, "mode": job.mode, "posts_collected": job.total_posts_collected},
+        ))
+        await self.db.flush()

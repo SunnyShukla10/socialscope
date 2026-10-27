@@ -15,6 +15,10 @@ class SearchJob(Base):
         UUID(as_uuid=True), ForeignKey("projects.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    initiated_by: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    initiator_label: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="pending")
     platforms: Mapped[list] = mapped_column(JSONB, nullable=False, default=list)
     date_from: Mapped[DateTime] = mapped_column(DateTime(timezone=True), nullable=True)

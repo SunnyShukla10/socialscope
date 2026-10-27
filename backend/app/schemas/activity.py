@@ -8,6 +8,7 @@ from pydantic import BaseModel
 class ActivityEventOut(BaseModel):
     id: uuid.UUID
     project_id: Optional[uuid.UUID] = None
+    actor_user_id: Optional[uuid.UUID] = None
     actor_label: str
     action: str
     target_type: str

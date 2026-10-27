@@ -13,6 +13,7 @@ import {
   X,
   Radio,
 } from 'lucide-react'
+import { FeedbackDialog } from '@/components/feedback-dialog'
 import type { User } from '@/lib/api'
 
 interface NavItem {
@@ -103,6 +104,7 @@ export function Sidebar({ user }: SidebarProps) {
             {item.label}
           </Link>
         ))}
+        <FeedbackDialog />
       </nav>
 
       {/* User info + logout */}

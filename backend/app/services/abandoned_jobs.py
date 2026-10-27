@@ -155,6 +155,9 @@ async def reconcile_abandoned_jobs(
             )
         )
 
+        from app.services.activity_service import ActivityService
+        await ActivityService(db).collection_outcome(job)
+
     if recovered:
         await db.commit()
     return recovered

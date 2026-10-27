@@ -73,6 +73,6 @@ async def delete_project(
     current_user=Depends(AuthService.get_current_user),
 ):
     service = ProjectService(db)
-    deleted = await service.delete_project(project_id, current_user.organization_id)
+    deleted = await service.delete_project(project_id, current_user.organization_id, actor=current_user)
     if not deleted:
         raise HTTPException(status_code=404, detail="Project not found")

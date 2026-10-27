@@ -19,6 +19,10 @@ class _Db:
         self.post = post
         self.deleted = None
         self.flushed = False
+        self.events = []
+
+    def add(self, event):
+        self.events.append(event)
 
     async def execute(self, _query):
         return _Result(scalar=self.post)
@@ -32,7 +36,7 @@ class _Db:
 
 @pytest.mark.asyncio
 async def test_exclusion_preserves_post():
-    post = SimpleNamespace(id=uuid.uuid4())
+    post = SimpleNamespace(id=uuid.uuid4(), excluded=False)
     db = _Db(post)
 
     deleted = await PostService(db).set_exclusion(uuid.uuid4(), post.id, uuid.uuid4(), True)
@@ -41,6 +45,7 @@ async def test_exclusion_preserves_post():
     assert db.deleted is None
     assert post.excluded is True
     assert db.flushed is True
+    assert [event.action for event in db.events] == ["post_excluded"]
 
 
 @pytest.mark.asyncio

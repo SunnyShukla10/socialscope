@@ -40,4 +40,11 @@ frontend/.next-validation*/
 backups/
 benchmark-plan.json
 
-docs/
+# Track reviewed Markdown guides only; keep manifests and other artifacts private.
+/docs/*
+!/docs/FEEDBACK.md
+!/docs/HANDBOOK.md
+!/docs/ROADMAP.md
+!/docs/COLLECTION_FEASIBILITY.md
+!/docs/PORTS_AND_CONFIGURATION.md
+CHANGELOG.md

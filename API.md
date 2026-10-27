@@ -115,3 +115,25 @@ mean missing provider data. These are cumulative counters observed at collection
 time, grouped by the publication date of their posts, not interaction dates.
 The analytics page shares platform/pull selectors between these two charts;
 other analytics sections retain their project-wide scope.
+
+## Pilot account, activity, and feedback additions (2026-10-26)
+
+All routes below require authentication; `/api/admin/*` additionally requires an active admin and always scopes records to that admin's organization. Client-supplied organization, role, or identity fields are rejected in the new write schemas.
+
+| Method / path | Behavior |
+|---|---|
+| GET `/api/admin/users?limit=25&offset=0` | Name, email, role, status, ID; default limit 100, maximum 200 |
+| POST `/api/admin/users` | `{full_name, email, password}` creates an active **member** in the admin's organization; returns safe user fields, never a password |
+| PATCH `/api/admin/users/{id}` | `{is_active}` enables/disables an organization account; disabling last active admin returns 409 |
+| GET `/api/admin/audit-log?user_id=<uuid>&limit=25&offset=0` | Optional actor filter, default limit 100, maximum 250; newest first, stable ID tie-breaker |
+| POST `/api/feedback` | `{kind: "feedback" or "issue", message, page_path}`; returns report ID with 201 |
+| GET `/api/admin/feedback?limit=25&offset=0` | Private organization reports; default limit 25, maximum 100 |
+| PATCH `/api/admin/feedback/{id}` | `{reviewed: true or false}` updates a private organization report |
+
+Offsets must be nonnegative. Pagination returns arrays; fewer than `limit` records means the final page (an exact multiple may be followed by an empty page). A user filter never broadens organization access. Unknown/inaccessible write targets return 404. Feedback submission has no user-facing listing route.
+
+New account emails are normalized and checked for duplicates; passwords require 12+ characters and at most 72 UTF-8 bytes. Blank names/messages are rejected. Feedback messages are limited to 5,000 characters; page paths to 1,000 characters. Query strings/fragments are stripped and external URLs rejected. The page is client-reported context, not trusted authorization evidence.
+
+Tokens include a session version. Password resets and status changes invalidate previous tokens. Existing unversioned tokens map to version zero until expiry or revocation; existing accounts start at version zero. No public registration, invitations, or email recovery endpoints are provided.
+
+Activity includes `actor_user_id`, actor label, target, timestamp, and safe metadata with outcome where applicable. `collection_pull_started` is retained for compatibility and displayed as **Collection submitted**; it does not mean execution has begun. `export_download_requested` means the authenticated download endpoint accepted the request, not that transfer finished. Account/password operation logs exclude secrets. Organization deletion still removes organization-owned records.
