@@ -14,6 +14,7 @@ from app.models.user import User
 from app.services.activity_service import ActivityService
 from app.services.search_service import SearchService
 from app.services.query_validation import validate_query
+from app.services.project_access import visible_projects
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +23,10 @@ class ProjectService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def list_projects(self, organization_id: uuid.UUID) -> List[dict]:
+    async def list_projects(self, organization_id: uuid.UUID, user: User) -> List[dict]:
+        scope = visible_projects(organization_id, user)
         result = await self.db.execute(
-            select(Project).where(Project.organization_id == organization_id).order_by(
+            select(Project).where(scope).order_by(
                 Project.created_at.desc()
             )
         )
@@ -53,6 +55,7 @@ class ProjectService:
         settings = {k: v for k, v in settings.items() if v not in (None, [], "")}
         project = Project(
             organization_id=organization_id,
+            owner_user_id=actor.id if actor else None,
             name=data.name,
             description=data.description,
             domain=data.domain,
@@ -189,7 +192,7 @@ class ProjectService:
     def _project_dict(self, project: Project) -> dict:
         settings = project.settings or {}
         return {
-            **project.__dict__.copy(),
+            **{column.key: getattr(project, column.key) for column in Project.__table__.columns},
             "research_question": settings.get("research_question"),
             "boolean_query": settings.get("boolean_query"),
             "platforms": settings.get("target_platforms") or settings.get("platforms") or [],

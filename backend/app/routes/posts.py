@@ -9,8 +9,9 @@ from app.database import get_db
 from app.schemas.post import PostListResponse
 from app.services.post_service import PostService
 from app.services.auth_service import AuthService
+from app.services.project_access import require_owned_project
 
-router = APIRouter(prefix="/api/projects/{project_id}/posts", tags=["posts"])
+router = APIRouter(prefix="/api/projects/{project_id}/posts", tags=["posts"], dependencies=[Depends(require_owned_project)])
 logger = logging.getLogger(__name__)
 
 

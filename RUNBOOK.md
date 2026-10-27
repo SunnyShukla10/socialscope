@@ -139,7 +139,7 @@ The command prompts for email, organization slug/name, administrator name, and a
 
 1. Log in with your individual admin account and open **Admin ? Users**.
 2. Create a member with their name, email, and a unique password. Share credentials privately through an encrypted channel. No invitation is sent.
-3. Members are assigned to the admin's organization by the server and share that organization's projects. Separate organizations cannot see each other's admin records or projects. There are no per-user project grants.
+3. Members are assigned to the admin's organization by the server, but projects are private to each user. Organization membership does not grant project access. Admins retain organization-wide activity/feedback oversight; normal research screens show their own projects plus unassigned legacy/retained projects.
 4. Click a person's email, or select them in the activity filter, to inspect their recorded actions. The filter offers the current Users page; navigate Users pages to find another person.
 5. Disable access when required. Disabling revokes existing tokens; re-enabling requires a fresh login. The final active admin is protected, including concurrent changes serialized by an organization row lock on PostgreSQL.
 
@@ -167,3 +167,25 @@ Reports use **Feedback / Report an issue** in the sidebar. Admins see their orga
 - A reset or disable invalidates tokens; sign in again after access is restored.
 - A failed feedback request retains its message in the form. Do not retry after a confirmed success.
 - Shared VM exposure still needs encrypted access, production configuration, backups/restores, monitoring, provider-account rate coordination, and live multi-user validation. None was changed or certified here.
+
+## Private projects, account deletion, and pasted errors ? 2026-10-27
+
+### Migration 015 and existing projects
+
+Back up the database and apply migration **015** with the matching application release before using these changes. No migration or deployment was performed by this implementation. The migration adds nullable `projects.owner_user_id` and `feedback.error_details`.
+
+For existing projects, ownership is backfilled only when a single valid same-organization creator can be identified from `project_created` activity. Ambiguous/missing creators remain unassigned and visible only to organization admins. No project data is erased. New projects always belong to the authenticated creator. Project routes and all child job/post/analytics/export routes check ownership; changing a URL cannot access a coworker's project. Both dashboard KPIs and project lists use the same visibility rule.
+
+Do not downgrade this migration as a casual rollback: removing ownership with older code restores organization-wide project sharing. Review access and restore a verified backup as appropriate before any rollback.
+
+### Delete a member account
+
+Use **Admin ? Users ? Delete** and review the confirmation. No admin account can be deleted through this endpoint, including when multiple admins exist. Members cannot delete accounts. A member with queued/running/cancelling collections must finish those jobs first; the endpoint returns 409 otherwise.
+
+Deletion removes the account and invalidates its tokens because the user no longer exists. Research projects, exports, activity, and feedback are retained. Project ownership becomes unassigned (administrator-only); activity and feedback keep identity snapshots while their user references are cleared. Recreating the same email creates a new identity with an empty project list. Deletion is not a research-data erasure action. The existing project delete operation remains separate.
+
+### Password visibility and feedback
+
+The account form's eye button affects only the password currently being typed; stored passwords cannot be retrieved. New passwords start hidden, and successful creation hides/clears the field.
+
+Feedback opens from the sidebar above the page, including on mobile. Its optional **Error details** field preserves pasted line breaks and indentation (maximum 20,000 characters). The message remains required. Both fields survive a failed submission. Reports stay private to same-organization admins and show the exact pasted error in a scrollable text block. Ask reporters to remove secrets before submitting; the application does not automatically collect console logs or error responses.

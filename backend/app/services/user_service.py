@@ -1,6 +1,6 @@
 """Organization-scoped account administration, shared by API and operator tool."""
 from fastapi import HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import func, select, delete, update, or_
 from sqlalchemy.exc import IntegrityError
 from app.models.organization import Organization
 from app.models.user import User
@@ -72,3 +72,36 @@ async def reset_password(db, user, password):
         organization_id=user.organization_id, actor_label="Operator",
         action="account_password_reset", target_type="user", target_id=str(user.id), target_label=user.email,
     )
+
+
+async def delete_member(db, admin, user_id):
+    """Delete access only; preserve research data and identity snapshots in history."""
+    from app.models.project import Project
+    from app.models.search_job import SearchJob
+    from app.models.activity_event import ActivityEvent
+    from app.models.feedback import Feedback
+
+    await lock_organization(db, admin.organization_id)
+    await db.refresh(admin)
+    if not admin.is_active or admin.role != "admin":
+        raise HTTPException(403, "Admin access required")
+    user = await db.scalar(select(User).where(User.id == user_id, User.organization_id == admin.organization_id))
+    if not user:
+        raise HTTPException(404, "User not found")
+    if user.role == "admin":
+        raise HTTPException(409, "Administrator accounts cannot be deleted")
+    owned_projects = select(Project.id).where(Project.owner_user_id == user.id)
+    active_job = await db.scalar(select(SearchJob.id).where(
+        or_(SearchJob.initiated_by == user.id, SearchJob.project_id.in_(owned_projects)),
+        SearchJob.status.in_(["pending", "queued", "running", "cancelling"])).limit(1))
+    if active_job:
+        raise HTTPException(409, "Wait for this user's active collections to finish before deleting the account")
+    await ActivityService(db).log(organization_id=admin.organization_id, actor=admin,
+        action="account_deleted", target_type="user", target_id=str(user.id), target_label=user.email)
+    # Explicitly detach references to preserve the same behavior on test SQLite and PostgreSQL.
+    await db.execute(update(Project).where(Project.owner_user_id == user.id).values(owner_user_id=None))
+    await db.execute(update(SearchJob).where(SearchJob.initiated_by == user.id).values(initiated_by=None))
+    await db.execute(update(SearchJob).where(SearchJob.cancel_requested_by == user.id).values(cancel_requested_by=None))
+    await db.execute(update(ActivityEvent).where(ActivityEvent.actor_user_id == user.id).values(actor_user_id=None))
+    await db.execute(update(Feedback).where(Feedback.user_id == user.id).values(user_id=None))
+    await db.execute(delete(User).where(User.id == user.id))

@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   Radio,
+  MessageSquare,
 } from 'lucide-react'
 import { FeedbackDialog } from '@/components/feedback-dialog'
 import type { User } from '@/lib/api'
@@ -48,6 +49,7 @@ export function Sidebar({ user }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
 
   function handleLogout() {
     localStorage.removeItem('socialscope_token')
@@ -59,7 +61,7 @@ export function Sidebar({ user }: SidebarProps) {
     return pathname.startsWith(href)
   }
 
-  const SidebarContent = () => (
+  const renderSidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="px-5 py-5 border-b border-border">
@@ -104,7 +106,11 @@ export function Sidebar({ user }: SidebarProps) {
             {item.label}
           </Link>
         ))}
-        <FeedbackDialog />
+        <button type="button" onClick={() => { setFeedbackOpen(true); setMobileOpen(false) }}
+          className="w-full flex items-center gap-3 px-3 py-2.5 text-left text-sm font-medium text-text-muted hover:text-text hover:bg-background rounded-lg">
+          <MessageSquare size={18} className="shrink-0" />
+          <span>Feedback / Report an issue</span>
+        </button>
       </nav>
 
       {/* User info + logout */}
@@ -142,7 +148,7 @@ export function Sidebar({ user }: SidebarProps) {
     <>
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex flex-col w-60 shrink-0 bg-surface border-r border-border h-screen sticky top-0">
-        <SidebarContent />
+        {renderSidebarContent()}
       </aside>
 
       {/* Mobile hamburger */}
@@ -169,8 +175,9 @@ export function Sidebar({ user }: SidebarProps) {
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
-        <SidebarContent />
+        {renderSidebarContent()}
       </aside>
+      <FeedbackDialog open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
     </>
   )
 }

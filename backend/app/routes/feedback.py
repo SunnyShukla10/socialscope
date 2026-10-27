@@ -14,7 +14,7 @@ async def submit_feedback(body: FeedbackCreate, db: AsyncSession = Depends(get_d
                           user=Depends(AuthService.get_current_user)):
     report = Feedback(
         organization_id=user.organization_id, user_id=user.id, submitter_label=user.email,
-        kind=body.kind, message=body.message, page_path=body.page_path,
+        kind=body.kind, message=body.message, error_details=body.error_details, page_path=body.page_path,
     )
     db.add(report)
     await db.flush()

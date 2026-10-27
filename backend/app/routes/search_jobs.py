@@ -10,8 +10,9 @@ from app.schemas.search_job import (
 )
 from app.services.search_service import SearchService
 from app.services.auth_service import AuthService
+from app.services.project_access import require_owned_project
 
-router = APIRouter(prefix="/api/projects/{project_id}/jobs", tags=["search_jobs"])
+router = APIRouter(prefix="/api/projects/{project_id}/jobs", tags=["search_jobs"], dependencies=[Depends(require_owned_project)])
 
 
 @router.post("", response_model=SearchJobOut, status_code=status.HTTP_201_CREATED)

@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useEffect } from 'react'
+import React, { useEffect, useId, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { cn } from '@/lib/utils'
 import { X } from 'lucide-react'
 
@@ -30,21 +31,45 @@ export function Dialog({
   className,
   size = 'md',
 }: DialogProps) {
+  const panel = useRef<HTMLDivElement>(null)
+  const close = useRef(onClose)
+  const titleId = useId()
+  useEffect(() => { close.current = onClose }, [onClose])
   useEffect(() => {
-    if (open) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = ''
+    if (!open) return
+    const previousFocus = document.activeElement as HTMLElement | null
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    const controls = () => Array.from(panel.current?.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href], [tabindex="0"]'
+    ) || [])
+    const preferred = panel.current?.querySelector<HTMLElement>('[data-dialog-autofocus]')
+    ;(preferred || controls()[0] || panel.current)?.focus()
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') { event.preventDefault(); close.current(); return }
+      if (event.key !== 'Tab') return
+      const items = controls(), first = items[0], last = items[items.length - 1]
+      if (!first) { event.preventDefault(); panel.current?.focus(); return }
+      if (!panel.current?.contains(document.activeElement) || document.activeElement === panel.current) {
+        event.preventDefault(); (event.shiftKey ? last : first).focus()
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault(); last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault(); first.focus()
+      }
     }
+    document.addEventListener('keydown', onKey)
     return () => {
-      document.body.style.overflow = ''
+      document.removeEventListener('keydown', onKey)
+      document.body.style.overflow = previousOverflow
+      if (previousFocus?.isConnected) previousFocus.focus()
     }
   }, [open])
 
-  if (!open) return null
+  if (!open || typeof document === 'undefined') return null
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+  return createPortal(
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4">
       {/* Overlay */}
       <div
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
@@ -52,8 +77,14 @@ export function Dialog({
       />
       {/* Panel */}
       <div
+        ref={panel}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
+        aria-label={title ? undefined : 'Dialog'}
+        tabIndex={-1}
         className={cn(
-          'relative w-full bg-surface border border-border rounded-xl shadow-xl z-10',
+          'relative w-full max-h-[90dvh] overflow-y-auto bg-surface border border-border rounded-xl shadow-xl z-10',
           sizeClasses[size],
           className
         )}
@@ -61,12 +92,14 @@ export function Dialog({
         {/* Header */}
         {(title || description) && (
           <div className="px-6 py-5 border-b border-border">
-            {title && <h2 className="text-base font-semibold text-text">{title}</h2>}
+            {title && <h2 id={titleId} className="text-base font-semibold text-text">{title}</h2>}
             {description && <p className="text-sm text-text-muted mt-1">{description}</p>}
           </div>
         )}
         {/* Close button */}
         <button
+          type="button"
+          aria-label="Close dialog"
           onClick={onClose}
           className="absolute top-4 right-4 p-1.5 rounded text-text-muted hover:text-text hover:bg-border/40 transition-colors"
         >
@@ -75,7 +108,7 @@ export function Dialog({
         {/* Content */}
         <div>{children}</div>
       </div>
-    </div>
+    </div>, document.body
   )
 }
 

@@ -16,6 +16,7 @@ class Feedback(Base):
     submitter_label: Mapped[str] = mapped_column(String(255))
     kind: Mapped[str] = mapped_column(String(20))
     message: Mapped[str] = mapped_column(Text)
+    error_details: Mapped[str | None] = mapped_column(Text, nullable=True)
     page_path: Mapped[str] = mapped_column(String(1000))
     reviewed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     created_at: Mapped[DateTime] = mapped_column(DateTime(timezone=True), server_default=func.now())

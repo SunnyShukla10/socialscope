@@ -3,13 +3,14 @@
 import React, { useEffect, useState } from 'react'
 import { fetchApi } from '@/lib/api'
 import { Button } from '@/components/ui/button'
+import { Eye, EyeOff } from 'lucide-react'
 
 type Account = { id: string; full_name: string; email: string; role: string; is_active: boolean }
 type Activity = {
   id: string; actor_label: string; action: string; target_label?: string; target_type: string
   target_id?: string; created_at: string; extra_metadata: { outcome?: string; mode?: string }
 }
-type Report = { id: string; submitter_label: string; kind: string; message: string; page_path: string; created_at: string; reviewed: boolean }
+type Report = { id: string; submitter_label: string; kind: string; message: string; error_details?: string | null; page_path: string; created_at: string; reviewed: boolean }
 const pageSize = 25
 const sectionClass = 'bg-surface border border-border rounded-xl p-6 space-y-4'
 const inputClass = 'rounded border border-border bg-background p-2 text-sm text-text'
@@ -40,6 +41,7 @@ export function PilotAdmin() {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => {
     let active = true
@@ -76,16 +78,27 @@ export function PilotAdmin() {
 
     <section className={sectionClass}>
       <h2 className="text-base font-semibold text-text">Users</h2>
-      <p className="text-sm text-text-muted">Members in this organization share its projects. Add participants when you are ready.</p>
+      <p className="text-sm text-text-muted">Each account starts with its own projects. Admin activity oversight stays available here.</p>
       <form className="flex flex-wrap items-end gap-3" onSubmit={async event => {
         event.preventDefault()
         if (await mutate('/admin/users', 'POST', { full_name: name, email, password }, 'Member account created.')) {
-          setName(''); setEmail(''); setPassword(''); setUserPage(0)
+          setName(''); setEmail(''); setPassword(''); setShowPassword(false); setUserPage(0)
         }
       }}>
         <label className="text-sm text-text">Name<input required maxLength={255} value={name} onChange={e => setName(e.target.value)} className={`block mt-1 ${inputClass}`} /></label>
         <label className="text-sm text-text">Email<input required type="email" maxLength={255} value={email} onChange={e => setEmail(e.target.value)} className={`block mt-1 ${inputClass}`} /></label>
-        <label className="text-sm text-text">Password<input required type="password" autoComplete="new-password" minLength={12} value={password} onChange={e => setPassword(e.target.value)} className={`block mt-1 ${inputClass}`} /></label>
+        <div className="text-sm text-text">
+          <label htmlFor="new-member-password">Password</label>
+          <div className="relative mt-1">
+            <input id="new-member-password" required type={showPassword ? 'text' : 'password'} autoComplete="new-password"
+              minLength={12} value={password} onChange={e => setPassword(e.target.value)} className={`${inputClass} pr-10`} />
+            <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text"
+              onClick={() => setShowPassword(value => !value)} aria-label={showPassword ? 'Hide password' : 'Show password'}
+              aria-pressed={showPassword} aria-controls="new-member-password">
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+        </div>
         <Button type="submit" disabled={busy || loading}>Create member</Button>
       </form>
       <p className="text-xs text-text-muted">Passwords require at least 12 characters and at most 72 UTF-8 bytes. Share credentials privately through an encrypted channel.</p>
@@ -97,7 +110,15 @@ export function PilotAdmin() {
           <td className="p-2"><Button variant="outline" disabled={busy || loading} onClick={() => {
             if (user.is_active && !window.confirm(`Disable access for ${user.email}?`)) return
             void mutate(`/admin/users/${user.id}`, 'PATCH', { is_active: !user.is_active }, 'Account access updated.')
-          }}>{user.is_active ? 'Disable' : 'Enable'}</Button></td>
+          }}>{user.is_active ? 'Disable' : 'Enable'}</Button>
+            {user.role !== 'admin' && <Button variant="outline" className="ml-2 text-red-600" disabled={busy || loading} onClick={async () => {
+              if (!window.confirm(`Delete the account for ${user.email}? Access will be removed permanently. Research data and history will be retained for administrators.`)) return
+              if (await mutate(`/admin/users/${user.id}`, 'DELETE', undefined, 'Member account deleted. Research data and history retained.')) {
+                if (filter === user.id) { setFilter(''); setActivityPage(0) }
+                setUserPage(0)
+              }
+            }}>Delete</Button>}
+          </td>
         </tr>)}</tbody>
       </table></div>
       {!users.length && !loading && <p className="text-sm text-text-muted">No users on this page.</p>}
@@ -134,6 +155,9 @@ export function PilotAdmin() {
         <p><strong>{report.kind === 'issue' ? 'Issue' : 'Feedback'}</strong> · {report.submitter_label} · {new Date(report.created_at).toLocaleString()}</p>
         <p className="text-xs text-text-muted break-all">{report.page_path}</p>
         <p className="whitespace-pre-wrap break-words">{report.message}</p>
+        {report.error_details && <div><p className="font-medium mb-1">Pasted error details</p>
+          <pre className="whitespace-pre-wrap break-words overflow-x-auto max-h-80 overflow-y-auto rounded border border-border bg-background p-3 text-xs font-mono">{report.error_details}</pre>
+        </div>}
         <label className="flex items-center gap-2"><input type="checkbox" checked={report.reviewed} disabled={busy || loading}
           onChange={e => { void mutate(`/admin/feedback/${report.id}`, 'PATCH', { reviewed: e.target.checked }, 'Review status saved.') }} />Reviewed</label>
       </article>)}

@@ -131,7 +131,7 @@ An alternative is one full post copy per run, deduplicated only at read time. It
 
 [API.md](../API.md) lists routes and example bodies. Pydantic handles transport validation, while services enforce ownership and pull lifecycle. Unknown platforms, more than 5,000 requested posts, comparison budgets over eight, and reversed dates are rejected before queuing. Naive input datetimes become UTC. Blank dates preserve adapter defaults. Frontend checks improve feedback; backend checks remain authoritative.
 
-Authentication verifies a password hash and issues a signed JWT. `AuthService.get_current_user` validates the token subject, loads the user, and supplies organization identity. Admin routes also require admin role. Existing organization users broadly share project access; there are no individual project grants, invitations, or email recovery flows. Admins can create members and disable access; operators can reset passwords interactively. See the pilot account addendum below.
+Authentication verifies a password hash and issues a signed JWT. `AuthService.get_current_user` validates the token subject, loads the user, and supplies organization identity. Admin routes also require admin role. Projects now have individual owners and backend ownership checks; organization membership alone does not grant project access. Invitations and email recovery remain unimplemented. Admins can create members and disable access; operators can reset passwords interactively. See the pilot account addendum below.
 
 Validation diagnostics omit raw input fields, which could contain credentials. Provider errors use safe provider/status/type summaries. Admin credential status hides key fragments. Queries and public text can still be sensitive research material, so review diagnostics before sharing them.
 
@@ -306,10 +306,20 @@ Do not claim users served, production uptime, throughput, cost savings, or bench
 
 Migration 014 adds `feedback`, nullable `SearchJob.initiated_by`/`initiator_label`, and `User.token_version`. New jobs retain the initiating account independently of later workers; legacy jobs stay unattributed. Terminal outcome logging runs in the locked job's transaction and uses a deterministic event ID to prevent duplicate outcome records. Existing research/provider behavior is unchanged.
 
-`services/user_service.py` handles organization-scoped member creation and status changes. An organization row lock serializes changes protecting the last active admin. `AuthService` checks active status and token version on requests. Reset/status changes invalidate old tokens. Organization users continue sharing projects; account separation is not project-level privacy.
+`services/user_service.py` handles organization-scoped member creation and status changes. An organization row lock serializes changes protecting the last active admin. `AuthService` checks active status and token version on requests. Reset/status changes invalidate old tokens. As of migration 015, projects are private to their creator. Organization identity still scopes admin oversight; it no longer grants shared project access.
 
 `app.manage_users` provides hidden-prompt bootstrap/reset operations. Seed calls the same create-only bootstrap helper. Admin UI provides paginated users, per-person activity, and reviewed feedback. Project deletion preserves audit history with stored labels. Logging does not track every page view and does not prove a user is online or a download completed.
 
 The feedback form attaches user identity server-side and submits only a page path, type, and message. The backend validates text, removes query/fragment data, rejects external paths, and limits access to same-organization admins. Reports remain private.
 
 These are preparation features, not proof of deployed multi-user capacity. No real participants were added. Encrypted hosting, production settings, provider-account coordination, and verified backup/restore procedures remain deployment work. See [RUNBOOK](../RUNBOOK.md) and [TESTING_GUIDE](../TESTING_GUIDE.md).
+
+## Private projects and usability fixes ? 2026-10-27
+
+`services/project_access.py` centralizes project visibility and a route dependency. Lists/dashboard use the visibility predicate, and all project detail/mutation and child routers enforce the dependency before accessing records. `ProjectService` assigns the creator and serializes only database columns (not SQLAlchemy instance state), keeping nonempty dashboards JSON-safe. Trusted worker services retain their existing project-based operations.
+
+Migration 015 backfills ownership from a single valid creation actor; it does not guess ambiguous owners. Unknown legacy and deleted-member projects are unassigned and administrator-only. New users, including reused email accounts, start empty. Admin audit/feedback visibility remains organization-wide.
+
+Member deletion detaches user references while preserving research data, report text, and audit identity snapshots. Admin deletion is always rejected. Active collections block deletion. This is account removal, not a data erasure workflow.
+
+Dialogs now render through a React portal directly under the body, escaping sidebar stacking/transform contexts. The feedback instance lives outside the duplicated desktop/mobile sidebar content, so closing the mobile drawer does not destroy the form. Shared dialogs trap keyboard focus, restore it when possible, and scroll within the viewport. Optional pasted errors are stored and displayed as plain text; there is no automatic error capture.

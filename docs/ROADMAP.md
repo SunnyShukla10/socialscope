@@ -6,7 +6,7 @@ This is a proposed sequence, not implemented scope. Start with observed research
 
 | Local pilot assumption | Why it is acceptable locally | Required change for shared hosting |
 |---|---|---|
-| Individual member/admin accounts and organization sharing | Accounts can be provisioned later with admin oversight | Validate isolation on PostgreSQL; add project grants only if private projects are needed |
+| Individual member/admin accounts with private project ownership | New accounts start empty; admins oversee organization activity | Validate migration backfill and isolation on PostgreSQL |
 | Provider keys in a private .env | Simple administrator-managed installation | Central secret storage with access/rotation/audit procedures |
 | Each install enforces its own pull limits | Limits one test workflow | Shared provider-account and workspace ceilings across all users/processes |
 | Process-local provider rate controls, one worker | Keeps one process's activity predictable | Distributed account-level rate/concurrency control before adding workers |
@@ -107,4 +107,10 @@ First finish a clean-stack migration/build/browser smoke test. Then collect feed
 
 Individual member creation, enable/disable controls, safe initial admin provisioning and operator password reset, organization-scoped per-person activity, and a simple private feedback inbox are implemented. Seed no longer overwrites existing users. Intended Markdown documentation is allowlisted for version control; other documentation artifacts remain ignored.
 
-No real pilot accounts have been added. Public signup, email invitations/recovery, cross-organization owner dashboards, private per-person projects, distributed provider limits, production hosting, and live concurrent-user validation are not part of this change. Earlier roadmap proposals remain proposals unless explicitly identified here or in the changelog.
+No real pilot accounts have been added. Public signup, email invitations/recovery, cross-organization owner dashboards, distributed provider limits, production hosting, and live concurrent-user validation are not part of this change. Earlier roadmap proposals remain proposals unless explicitly identified here or in the changelog.
+
+## Implemented follow-up ? 2026-10-27
+
+Private project ownership, protected member-account deletion, an account-form password eye toggle, and optional pasted error details are implemented. Feedback remains in the sidebar, with portal-based dialog layering for desktop/mobile. Migration 015 retains existing data and uses unambiguous creation events for legacy ownership. These changes supersede earlier shared-project assumptions.
+
+Cross-user sharing/grants are not implemented; neither are automatic error capture, public registration, invitations, email recovery, or cross-organization owner administration. PostgreSQL migration execution and normal hosted browser acceptance remain operator checks.

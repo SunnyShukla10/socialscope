@@ -4,7 +4,7 @@ SocialScope supports topic/question -> optional dates -> source/query selection 
 
 ## Participants (accounts will be added later)
 
-Participants use the access link and individual account supplied by their administrator. They do not install Docker, configure provider keys, or run setup. Ask the administrator for a password reset if needed. Users in the same organization share its projects; individual logins identify actions rather than create private projects.
+Participants use the access link and individual account supplied by their administrator. They do not install Docker, configure provider keys, or run setup. Ask the administrator for a password reset if needed. Each user starts with a clean project list and sees only their own projects, results, collections, and exports. Admin activity oversight remains organization-wide.
 
 Use **Feedback / Report an issue** in the sidebar to send a short message. Your account, page path, and timestamp accompany the message. Administrators can review reports and filter activity by person.
 
@@ -72,3 +72,11 @@ After the first supervised pilot sessions, prioritize setup friction, query rele
 ## Operator: prepare accounts for later
 
 After applying migration 014, use **Admin ? Users** to create members in your organization when the pilot is ready. Do not share the initial admin login. Admins can enable/disable users and review activity and reports. The last active admin cannot be disabled. Password resets use the interactive operator tool described in [RUNBOOK.md](RUNBOOK.md); passwords are not command arguments. There is no public registration.
+
+## Private projects and feedback updates ? 2026-10-27
+
+Apply migration **015** before using this version. Existing project creation logs assign ownership where the creator is unambiguous and still belongs to the organization. Other legacy projects remain accessible only to organization administrators. Existing data is retained; migration does not copy projects into new accounts.
+
+In **Admin ? Users**, the eye button shows/hides the password while creating an account. **Delete** is available for member accounts only, with confirmation. Administrator accounts cannot be deleted. Deletion removes login access and retains research data and history; retained unassigned projects are administrator-only. Wait for a member's collections to finish before deleting their account.
+
+**Feedback / Report an issue** is in the left sidebar on desktop and in the mobile menu. The dialog sits above page content, and **Error details (optional)** accepts up to 20,000 characters of copied error text with line breaks preserved. Failed submissions retain both fields. Admins can read the pasted details in their feedback inbox.

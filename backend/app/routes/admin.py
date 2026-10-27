@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import uuid
@@ -12,7 +12,7 @@ from app.services.auth_service import AuthService
 from app.models.user import User
 from app.models.feedback import Feedback
 from app.schemas.pilot import MemberCreate, AdminUserOut, UserStatus, FeedbackOut, FeedbackReview
-from app.services.user_service import create_member, set_user_status
+from app.services.user_service import create_member, set_user_status, delete_member
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -102,3 +102,9 @@ async def review_feedback(feedback_id: uuid.UUID, body: FeedbackReview,
         raise HTTPException(404, "Feedback not found")
     report.reviewed = body.reviewed
     return report
+
+
+@router.delete("/users/{user_id}", status_code=204)
+async def remove_user(user_id: uuid.UUID, db: AsyncSession = Depends(get_db), admin=Depends(require_admin)):
+    await delete_member(db, admin, user_id)
+    return Response(status_code=204)

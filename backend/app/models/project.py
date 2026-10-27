@@ -15,6 +15,9 @@ class Project(Base):
         UUID(as_uuid=True), ForeignKey("organizations.id", ondelete="CASCADE"), nullable=False
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
+    owner_user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     description: Mapped[str] = mapped_column(Text, nullable=True)
     domain: Mapped[str] = mapped_column(String(100), nullable=False, default="general")
     status: Mapped[str] = mapped_column(String(50), nullable=False, default="active")

@@ -56,6 +56,7 @@ class FeedbackCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     kind: Literal["feedback", "issue"]
     message: str = Field(min_length=1, max_length=5000)
+    error_details: str | None = Field(default=None, max_length=20000)
     page_path: str = Field(min_length=1, max_length=1000)
 
     @field_validator("message")
@@ -80,6 +81,7 @@ class FeedbackOut(BaseModel):
     submitter_label: str
     kind: str
     message: str
+    error_details: str | None = None
     page_path: str
     reviewed: bool
     created_at: datetime

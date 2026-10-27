@@ -14,8 +14,9 @@ from app.schemas.analytics import (
 )
 from app.services.analytics_service import AnalyticsService
 from app.services.auth_service import AuthService
+from app.services.project_access import require_owned_project
 
-router = APIRouter(prefix="/api/projects/{project_id}/analytics", tags=["analytics"])
+router = APIRouter(prefix="/api/projects/{project_id}/analytics", tags=["analytics"], dependencies=[Depends(require_owned_project)])
 
 
 @router.get("/overview", response_model=KPIOverview)

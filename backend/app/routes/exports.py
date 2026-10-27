@@ -9,8 +9,9 @@ from app.database import get_db
 from app.schemas.export import ExportRequest, ExportJobOut
 from app.services.export_service import ExportService
 from app.services.auth_service import AuthService
+from app.services.project_access import require_owned_project
 
-router = APIRouter(prefix="/api/projects/{project_id}/exports", tags=["exports"])
+router = APIRouter(prefix="/api/projects/{project_id}/exports", tags=["exports"], dependencies=[Depends(require_owned_project)])
 logger = logging.getLogger(__name__)
 
 

@@ -6,6 +6,7 @@ from app.database import get_db
 from app.schemas.project import ProjectCreate, ProjectLaunchCreate, ProjectUpdate, ProjectOut
 from app.services.project_service import ProjectService
 from app.services.auth_service import AuthService
+from app.services.project_access import require_owned_project
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -16,7 +17,7 @@ async def list_projects(
     current_user=Depends(AuthService.get_current_user),
 ):
     service = ProjectService(db)
-    return await service.list_projects(current_user.organization_id)
+    return await service.list_projects(current_user.organization_id, user=current_user)
 
 
 @router.post("", response_model=ProjectOut, status_code=status.HTTP_201_CREATED)
@@ -39,7 +40,7 @@ async def launch_project(
     return await service.launch_project(body, current_user.organization_id, actor=current_user)
 
 
-@router.get("/{project_id}", response_model=ProjectOut)
+@router.get("/{project_id}", response_model=ProjectOut, dependencies=[Depends(require_owned_project)])
 async def get_project(
     project_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -52,7 +53,7 @@ async def get_project(
     return project
 
 
-@router.patch("/{project_id}", response_model=ProjectOut)
+@router.patch("/{project_id}", response_model=ProjectOut, dependencies=[Depends(require_owned_project)])
 async def update_project(
     project_id: uuid.UUID,
     body: ProjectUpdate,
@@ -66,7 +67,7 @@ async def update_project(
     return project
 
 
-@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{project_id}", status_code=status.HTTP_204_NO_CONTENT, dependencies=[Depends(require_owned_project)])
 async def delete_project(
     project_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
