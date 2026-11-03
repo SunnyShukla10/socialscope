@@ -18,26 +18,26 @@ Install Docker Desktop (Linux containers/Compose) and Python 3 for the setup hel
 python scripts/setup.py
 ```
 
-Privately edit the newly created `.env`. Add the administrator's shared `SOCIALVAULT_API_KEY` and `XPOZ_API_KEY`; never commit or share this file. The pilot uses **the administrator's shared provider accounts**, not a separate paid account for each tester. Setup generates `SECRET_KEY` and `LOCAL_ADMIN_PASSWORD` and preserves any existing .env.
+Privately edit the newly created `.env.development`. Add `SOCIALVAULT_API_KEY` and `XPOZ_API_KEY` only for intentional live collection tests; never commit or share this file. The pilot uses **the administrator's shared provider accounts**, not a separate paid account for each tester. Setup generates `SECRET_KEY` and `LOCAL_ADMIN_PASSWORD` and preserves any existing .env.
 
 ```powershell
-docker compose up --build -d
-docker compose ps --all
-docker compose logs --tail 50 migrate seed
+docker compose --env-file .env.development -f compose.development.yml up --build -d
+docker compose --env-file .env.development -f compose.development.yml ps --all
+docker compose --env-file .env.development -f compose.development.yml logs --tail 50 migrate seed
 python scripts/check-connectivity.py
 ```
 
-Open **http://localhost:3002**. Sign in with `LOCAL_ADMIN_EMAIL` and `LOCAL_ADMIN_PASSWORD` from your .env. Migrations and seed run automatically. Seed creates a missing initial account only; existing passwords, roles, names, and organizations are preserved. The default email is `admin@socialscope.local`; setup generates the password. The API reference is http://localhost:8002/api/docs. Source availability and version/build appear on the dashboard. Missing keys permit browsing/setup but produce explicit unavailable collection outcomes.
+Open **http://localhost:3102**. Sign in with `LOCAL_ADMIN_EMAIL` and `LOCAL_ADMIN_PASSWORD` from your .env. Migrations and seed run automatically. Seed creates a missing initial account only; existing passwords, roles, names, and organizations are preserved. The development admin email is `admin@socialscope-dev.local`; setup generates the password. The API reference is http://localhost:8102/api/docs. Source availability and version/build appear on the dashboard. Missing keys permit browsing/setup but produce explicit unavailable collection outcomes.
 
 Wait for `migrate` and `seed` to finish with exit code 0 before signing in; those one-shot containers are expected to exit. The connectivity helper checks HTTP reachability, not the full dependency-health response. Follow the health checks in [RUNBOOK](RUNBOOK.md).
 
-Default host ports are frontend **3002**, backend **8002**, Redis **6381**, and PostgreSQL **5434**. Worker, scheduler, migration, and seed services have no published ports. See [Ports and configuration](docs/PORTS_AND_CONFIGURATION.md) for the full table and how to change ports. All localhost URLs in this guide assume the defaults.
+Development host ports are frontend **3102**, backend **8102**, Redis **6481**, and PostgreSQL **5534**; its project is `socialscope-dev`. Worker, scheduler, migration, and seed services have no published ports. See [Ports and configuration](docs/PORTS_AND_CONFIGURATION.md) for the full table and how to change ports. All localhost URLs in this guide assume the defaults.
 
 If startup fails, use [RUNBOOK](RUNBOOK.md). Current environment validation and remaining checks are in [TESTING_GUIDE](TESTING_GUIDE.md); a clean Docker startup is still a required acceptance check wherever Docker cannot run.
 
 ## Handoff package
 
-Share the application source, `docker-compose.yml`, Dockerfiles, `.env.example`, scripts, and documentation. Do not include `.env`, provider keys, login passwords, database backups, exports, validation artifacts, or `node_modules`. If sending an archive, exclude ignored files explicitly; Git ignore rules do not protect a manually zipped folder. The recipient should run setup to generate their own local login/signing secret, then obtain the shared provider credentials privately from the administrator.
+Share the application source, `compose.development.yml`, Dockerfiles, `.env.development.example`, scripts, and documentation. Do not include `.env.development`, provider keys, login passwords, database backups, exports, validation artifacts, or `node_modules`. If sending an archive, exclude ignored files explicitly; Git ignore rules do not protect a manually zipped folder. The recipient should run setup to generate their own local login/signing secret, then obtain the shared provider credentials privately from the administrator.
 
 The intended Markdown guides under `docs/` are allowlisted in `.gitignore`; other documentation artifacts and manifests remain ignored. Review files before including them in a handoff.
 

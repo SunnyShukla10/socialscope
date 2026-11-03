@@ -1,120 +1,64 @@
-# Docker ports and configuration
+# Development ports and configuration
 
-Reviewed against `docker-compose.yml`, `.env.example`, the Dockerfiles, and `frontend/next.config.js` on September 30, 2026. These are the configured defaults, not evidence that containers are currently running. Run commands from the `socialscope` repository root unless a different directory is stated.
+Development uses `compose.development.yml` plus private `.env.development`. Production uses `compose.production.yml` plus `.env.production`. They are standalone files, not layers to merge.
 
-## Every service and its ports
+## Ports and service addresses
 
-A **host port** is the port on your computer. A **container port** is where a service listens inside Docker. For example, `127.0.0.1:3002:3001` forwards your computer's port 3002 to the frontend container's port 3001.
+| Service | Development loopback host port | Container port | Internal address |
+|---|---|---|---|
+| Frontend | 3102 | 3001 | `http://frontend:3001` |
+| API | 8102 | 8001 | `http://backend:8001` |
+| PostgreSQL | 5534 | 5432 | `postgres:5432` |
+| Redis | 6481 | 6379 | `redis://redis:6379/0` |
 
-| Compose service | Role | Default host port | Container port | Address from another container | Host-port setting in root .env |
-|---|---|---:|---:|---|---|
-| `frontend` | Next.js web application | 3002 | 3001 | `http://frontend:3001` | `SOCIALSCOPE_WEB_PORT` |
-| `backend` | FastAPI HTTP API | 8002 | 8001 | `http://backend:8001` | `SOCIALSCOPE_API_PORT` |
-| `redis` | Celery broker and result backend | 6381 | 6379 | `redis://redis:6379/0` | `SOCIALSCOPE_REDIS_PORT` |
-| `postgres` | PostgreSQL database | 5434 | 5432 | `postgres:5432` | `SOCIALSCOPE_POSTGRES_PORT` |
-| `worker` | Celery collection tasks | None | No listening service port | Connects to Redis/PostgreSQL and provider APIs | None |
-| `scheduler` | Celery beat, schedules reconciliation | None | No listening service port | Connects to Redis to enqueue tasks | None |
-| `migrate` | One-shot Alembic migration | None | No listening service port | Connects to PostgreSQL | None |
-| `seed` | One-shot local account setup | None | No listening service port | Connects to PostgreSQL | None |
+Migration, seed, worker, and scheduler have no published ports. Development runs Next's development server and Uvicorn reload; production keeps its packaged application images. The browser calls the frontend's same-origin `/api` proxy. Provider keys never belong in frontend configuration.
 
-Docker itself has no additional SocialScope application port. Docker Desktop/Engine manages these containers; this Compose file does not publish a Docker Engine API port. External provider HTTPS connections are outbound traffic, not additional local ports to open.
+`SOCIALSCOPE_WEB_PORT`, `SOCIALSCOPE_API_PORT`, `SOCIALSCOPE_POSTGRES_PORT`, and `SOCIALSCOPE_REDIS_PORT` in `.env.development` change host ports only. Internal ports and URLs remain unchanged. Origins follow the configured development web port. Ports must be unused on the target machine; changing ports does not create a new database.
 
-All four published services bind to **127.0.0.1**, so they are accessible from the host computer, not directly from other computers on the network. In-container `0.0.0.0` bindings do not change that host restriction. Redis and PostgreSQL are not websites; use their clients rather than a browser.
+## Setup and explicit commands
 
-Default host addresses:
-
-- Web: http://localhost:3002
-- API reference: http://localhost:8002/api/docs
-- Dependency health: http://localhost:8002/api/health
-- PostgreSQL client: host `127.0.0.1`, port `5434`, database/user `socialscope` (the Compose file sets the local password to `socialscope`).
-- Redis client: host `127.0.0.1`, port `6381`, database `0` (no Redis password is configured for this loopback-only pilot).
-
-The browser normally requests `/api` on the frontend's origin. Next forwards that request to `http://backend:8001` through Docker's service network. A frontend host-port change therefore does not require changing the internal API URL.
-
-## Change host ports
-
-Finish or cancel active collections and wait for them to reach terminal status before recreating services. In the repository root's private `.env`, edit the existing four settings. For example:
-
-```dotenv
-SOCIALSCOPE_WEB_PORT=3102
-SOCIALSCOPE_API_PORT=8102
-SOCIALSCOPE_POSTGRES_PORT=5534
-SOCIALSCOPE_REDIS_PORT=6481
-```
-
-Choose unused ports and keep just one definition of each variable. Keep the container connection strings unchanged:
-
-```dotenv
-DATABASE_URL=postgresql+asyncpg://socialscope:socialscope@postgres:5432/socialscope
-REDIS_URL=redis://redis:6379/0
-```
-
-Do not replace their internal ports with 5534/6481 for the Docker deployment. Those new ports are only for host clients. The internal frontend proxy remains `http://backend:8001`.
-
-From the repository root:
-
-```powershell
-docker compose config --quiet
-docker compose up -d --force-recreate
-```
-
-This recreates the stack's containers with the new mappings and preserves its named volumes. It also reruns the one-shot migration/seed services; seed creates a missing account only and preserves existing account details. Use the interactive operator tool in RUNBOOK.md for password resets. `docker compose restart` alone does not apply changed environment values or published ports. Port-only changes do not require rebuilding images; a first installation still uses `docker compose up --build -d`.
-
-The Compose backend CORS setting is calculated from SOCIALSCOPE_WEB_PORT for both localhost and 127.0.0.1. You do not need to manually change CORS_ORIGINS for a Docker host-port-only change. The explicit Compose value takes precedence over the backend's env_file value.
-
-With the example settings, use http://localhost:3102 and http://localhost:8102/api/docs. Host database clients and TEST_DATABASE_URL must use 5534; host Redis clients must use 6481. Existing browser bookmarks need updating, and changing the web port creates a different browser origin, so sign in again. The setup helper prints default 3002 even when an existing .env uses another port; rely on the resolved mapping below.
-
-Environment variables set in your terminal can override the root .env when Compose resolves port settings. If a mapping differs from what you edited, check `Get-ChildItem Env:SOCIALSCOPE_*` and remove only an unintended override (for example `Remove-Item Env:SOCIALSCOPE_WEB_PORT`). Never share full `docker compose config` output: it can contain provider keys and other private environment values. `--quiet` validates without printing them.
-
-## Verify the effective ports and readiness
-
-These commands use **container** ports as arguments and print the effective host mappings:
-
-```powershell
-docker compose ps --all
-docker compose port frontend 3001
-docker compose port backend 8001
-docker compose port postgres 5432
-docker compose port redis 6379
+```bash
+python scripts/setup.py
+# Review .env.development privately.
+docker compose --env-file .env.development -f compose.development.yml config --quiet
+docker compose --env-file .env.development -f compose.development.yml up --build -d
+docker compose --env-file .env.development -f compose.development.yml ps --all
 python scripts/check-connectivity.py
 ```
 
-The helper discovers the current frontend/backend mappings automatically. It checks HTTP reachability/JSON parsing, not complete dependency readiness. Also inspect the health JSON, substituting your chosen API host port:
+Setup generates independent database, signing, and admin secrets and leaves provider keys blank. It never overwrites an existing `.env.development`, legacy `.env`, or production configuration. Migrations precede seed, seed precedes API readiness, and the frontend waits for the healthy API. Migration/seed exit code 0 is normal.
 
-```powershell
-Invoke-RestMethod http://127.0.0.1:8102/api/health
+Because filenames are explicit, always use both flags. `--env-file` supplies Compose interpolation; service `env_file` supplies runtime values. Exported shell variables can override interpolation, including project identity and host ports; check for unintended overrides. Never share full resolved Compose output because it includes credentials. `config --quiet` avoids printing them.
+
+## Read-only connectivity checks
+
+```bash
+docker compose --env-file .env.development -f compose.development.yml port frontend 3001
+docker compose --env-file .env.development -f compose.development.yml port backend 8001
+docker compose --env-file .env.development -f compose.development.yml port postgres 5432
+docker compose --env-file .env.development -f compose.development.yml port redis 6379
 ```
 
-Look for `status: ok`, `database: true`, and `redis: true`. HTTP 200 can also accompany degraded status in this pilot. Migration and seed should exit 0; check their logs if login or schema setup fails. These checks do not call social providers.
+The helper uses these exact development files to discover current ports. It checks reachability/JSON parsing, not every dependency field. Inspect `/api/health` for database/Redis booleans as well. On a VM, forward the web port through SSH and use the forwarded browser address; the helper does not test that tunnel.
 
-If a host port is occupied, choose another one in .env and recreate the containers. On Windows you can inspect listeners, for example `Get-NetTCPConnection -State Listen -LocalPort 3002 -ErrorAction SilentlyContinue`. Do not stop an unrelated application's process merely to reclaim its port.
+## Storage and coexistence
 
-## Native development
+The development project is `socialscope-dev`, which gives its own network and volumes: `socialscope-dev_postgres_data`, `socialscope-dev_redis_data`, `socialscope-dev_export_data`, plus frontend dependency/cache volumes. None is external or references production storage. Database/user are `socialscope_dev`; Compose constructs its URL using the generated URL-safe `SOCIALSCOPE_DEV_DB_PASSWORD`.
 
-Host processes use published host addresses, not Docker service names. For a native backend, use a private `backend/.env` with the required signing/login/provider configuration and override the connection strings for the host. With default ports:
+Production remains project `socialscope` with explicit external volume names and loopback web port 3002 by default. Use separate source folders on the VM, and never override the development name with production's name. Both environments still share machine resources; container limits do not cap image builds or guarantee production performance.
+
+Legacy `.env` and `socialscope_*` volumes are left untouched. New development accounts/projects start separately. Do not attach old production volumes just to make old data appear. Arrange a deliberate sanitized restore if old test data is needed. Changing database-password settings does not change an initialized PostgreSQL password.
+
+`stop` releases runtime resources; `down` removes development containers/network but keeps named volumes. Do not use `down -v` unless deliberately deleting development data, and do not run global prune commands as cleanup.
+
+## Native development compatibility
+
+The Python settings loader is unchanged and still supports a private `backend/.env` for raw native execution. For this optional workflow, supply the development signing/admin settings and host-based URLs using the actual generated development password (URL-encoded in DATABASE_URL):
 
 ```dotenv
-DATABASE_URL=postgresql+asyncpg://socialscope:socialscope@127.0.0.1:5434/socialscope
-REDIS_URL=redis://127.0.0.1:6381/0
-CORS_ORIGINS=http://localhost:3002,http://127.0.0.1:3002
+DATABASE_URL=postgresql+asyncpg://socialscope_dev:URL_ENCODED_DEVELOPMENT_PASSWORD@127.0.0.1:5534/socialscope_dev
+REDIS_URL=redis://127.0.0.1:6481/0
+CORS_ORIGINS=http://localhost:3102,http://127.0.0.1:3102
 ```
 
-Use 5534/6481 and web 3102 instead if you selected the example alternate ports. Run Uvicorn from `backend/` on host port 8002 (or your chosen API port). Root SOCIALSCOPE_* variables configure Compose mappings; they do not automatically change Uvicorn's `--port` or Next's development server port.
-
-In a native frontend terminal, from `frontend/`:
-
-```powershell
-$env:API_INTERNAL_URL='http://127.0.0.1:8002'
-npm ci
-npm run dev -- --port 3002
-```
-
-For a native production build, set API_INTERNAL_URL before `npm run build`, because the proxy rewrite is generated at build time. The root Compose .env is not automatically loaded by a native frontend. Keep provider keys out of frontend environment files. Do not run native servers and Docker-published servers on the same host ports; choose one mode or deliberately separate them.
-
-## Internal ports and multiple installations
-
-For ordinary conflicts, change only host ports. Changing an internal port is a coordinated code/configuration change: frontend PORT/healthcheck/mapping, backend Uvicorn/healthcheck/Next build-time proxy, or PostgreSQL/Redis server listener and every client URL must agree. Simply changing a host variable does none of that, and changing API_INTERNAL_URL in root .env alone does not rebuild the Docker frontend's proxy. Internal port changes are not needed for this pilot.
-
-SocialScope's default Compose project name is `socialscope`; its named volumes are scoped to that project. Port changes alone do not create a separate database or a second installation. To run an additional isolated SocialScope stack, use a separate project name consistently (`docker compose -p socialscope_second ...`) as well as distinct host ports and private configuration. The connectivity helper currently assumes the default project unless COMPOSE_PROJECT_NAME is set in its environment. Independent stacks still share spending if configured with the same provider credentials.
-
-For remote use, keep loopback bindings and use an intentional tunnel, or follow the [shared-hosting roadmap](ROADMAP.md) before exposing services. Do not publish the Docker Engine, database, or Redis ports to the network just to share the web application. [RUNBOOK](../RUNBOOK.md) covers operations; [START_HERE](../START_HERE.md) covers first setup.
+Do not copy a container URL directly into a host process; host processes cannot resolve Docker service names. Native Uvicorn should use the chosen host API port (8102 by default). Native Next needs `API_INTERNAL_URL=http://127.0.0.1:8102` before starting and port 3102. Do not run native servers and Docker-published servers on the same host ports. The root development environment is not automatically loaded by native app processes.

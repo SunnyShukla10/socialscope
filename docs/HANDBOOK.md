@@ -39,8 +39,8 @@ Background jobs avoid holding a browser request open during pagination, backoff,
 
 ```text
 socialscope/
-  docker-compose.yml       topology, ports, named volumes
-  .env.example             configuration names without provider keys
+  compose.development.yml       topology, ports, named volumes
+  .env.development.example             configuration names without provider keys
   backend/
     app/main.py            route registration and exception handling
     app/config.py          typed environment settings
@@ -237,11 +237,11 @@ The interface distinguishes missing keys, provider failures, safeguard stops, an
 
 ## 11. Local operations
 
-Compose project identity is `socialscope`. Default loopback host ports are web 3002, API 8002, PostgreSQL 5434, Redis 6381. Internal service addresses remain backend:8001, postgres:5432, redis:6379. Named PostgreSQL, Redis AOF, and export volumes are Compose-project scoped. SocialScope does not store its data in SocialPulse's containers or files.
+Compose development project identity is `socialscope-dev`. Default loopback host ports are web 3102, API 8102, PostgreSQL 5534, Redis 6481. Internal service addresses remain backend:8001, postgres:5432, redis:6379. Named PostgreSQL, Redis AOF, and export volumes are Compose-project scoped. SocialScope does not store its data in SocialPulse's containers or files.
 
-`scripts/setup.py` creates .env only if absent, generates a random signing secret and admin password, and leaves provider keys blank. The administrator privately supplies shared credentials. `docker compose up --build -d` builds services, applies migrations, seeds the local organization/admin, and starts the application and workers. Re-running seed preserves an existing account without updating its password, name, organization, or role. Use the interactive operator reset command to change an existing password.
+`scripts/setup.py` creates .env.development only if absent, generates a random signing secret and admin password, and leaves provider keys blank. The administrator privately supplies shared credentials. `docker compose --env-file .env.development -f compose.development.yml up --build -d` builds services, applies migrations, seeds the local organization/admin, and starts the application and workers. Re-running seed preserves an existing account without updating its password, name, organization, or role. Use the interactive operator reset command to change an existing password.
 
-Use `docker compose ps`, scoped logs, and `python scripts/check-connectivity.py`. Run commands from the destination. `docker compose down` preserves named data volumes; adding `-v` deletes them. Do not remove shared Docker storage to fix disk pressure.
+Use `docker compose --env-file .env.development -f compose.development.yml ps`, scoped logs, and `python scripts/check-connectivity.py`. Run commands from the destination. `docker compose --env-file .env.development -f compose.development.yml down` preserves named data volumes; adding `-v` deletes them. Do not remove shared Docker storage to fix disk pressure.
 
 Before migrations, stop collections and save a database dump plus the export volume. [RUNBOOK](../RUNBOOK.md) provides binary-safe commands. A backup is credible after a restore rehearsal into a separately named database. CSV is not a full backup: it omits users, full ledger state, and application configuration. Redis persistence helps queue durability but does not close the database/broker commit gap.
 
@@ -323,3 +323,9 @@ Migration 015 backfills ownership from a single valid creation actor; it does no
 Member deletion detaches user references while preserving research data, report text, and audit identity snapshots. Admin deletion is always rejected. Active collections block deletion. This is account removal, not a data erasure workflow.
 
 Dialogs now render through a React portal directly under the body, escaping sidebar stacking/transform contexts. The feedback instance lives outside the duplicated desktop/mobile sidebar content, so closing the mobile drawer does not destroy the form. Shared dialogs trap keyboard focus, restore it when possible, and scroll within the viewport. Optional pasted errors are stored and displayed as plain text; there is no automatic error capture.
+
+## Development/production configuration split - 2026-11-02
+
+The old development Compose/example names were replaced by `compose.development.yml` and `.env.development.example`; setup now creates private `.env.development`. Production configuration and runtime code are unchanged. Development uses project `socialscope-dev`, independent storage, fixed internal development database identity, and distinct loopback ports (3102/8102/5534/6481). Legacy data/private files are not moved or deleted.
+
+Next runs from `frontend/Dockerfile.development` with mounted source and independent dependency/cache volumes. Uvicorn reloads source edits; Celery task changes require a deliberate development worker restart. Resource limits apply to runtime containers, not image builds. Always select the environment explicitly in Compose commands. Refer to [RUNBOOK](../RUNBOOK.md) for migration from old configuration and the separate-folder VM workflow.

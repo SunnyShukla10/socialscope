@@ -52,20 +52,20 @@ For constrained build-only validation, SOCIALSCOPE_CHECK_BUILD=1 disables standa
 Run the following Compose command from the repository root. Use an isolated database named **socialscope_test**. Never point this test or migrations at SocialPulse. Once this stack's PostgreSQL is healthy, create a dedicated test database (choose deliberately; do not overwrite an existing database):
 
 ```powershell
-docker compose exec -T postgres createdb -U socialscope socialscope_test
+docker compose --env-file .env.development -f compose.development.yml exec -T postgres createdb -U socialscope_dev socialscope_test
 ```
 
 From backend with dependencies installed:
 
 ```powershell
-$env:TEST_DATABASE_URL='postgresql+asyncpg://socialscope:socialscope@127.0.0.1:5434/socialscope_test'
+$env:TEST_DATABASE_URL='postgresql+asyncpg://socialscope_dev:URL_ENCODED_DEVELOPMENT_PASSWORD@127.0.0.1:5534/socialscope_test'
 .\.venv\Scripts\python.exe -m pytest -q tests/test_research_workflow.py -k real_postgres
 Remove-Item Env:TEST_DATABASE_URL
 ```
 
-The URL above assumes PostgreSQL host port 5434; replace it if configured differently. See [Ports and configuration](docs/PORTS_AND_CONFIGURATION.md).
+The URL above assumes PostgreSQL host port 5534; replace it if configured differently. See [Ports and configuration](docs/PORTS_AND_CONFIGURATION.md).
 
-The test requires the exact disposable database name, creates a unique temporary schema, executes 36 competing requests, expects only eight reservations to succeed, and removes only its owned schema. It uses ORM metadata; separately run the actual migration chain against a fresh SocialScope database and verify `docker compose run --rm --no-deps migrate alembic current` reports 012 (run from the repository root). Exercise a clean `docker compose up --build -d` afterward. A passing PostgreSQL test verifies transaction behavior, not vendor billing behavior.
+The test requires the exact disposable database name, creates a unique temporary schema, executes 36 competing requests, expects only eight reservations to succeed, and removes only its owned schema. It uses ORM metadata; separately run the actual migration chain against a fresh SocialScope database and verify `docker compose --env-file .env.development -f compose.development.yml run --rm --no-deps migrate alembic current` reports 015 (head) (run from the repository root). Exercise a clean `docker compose --env-file .env.development -f compose.development.yml up --build -d` afterward. A passing PostgreSQL test verifies transaction behavior, not vendor billing behavior.
 
 ## Coverage and why it matters
 
@@ -129,3 +129,14 @@ These host/browser checks remain pending. This release prepares future participa
 - A small isolated browser harness under ignored `.validation/` uses actual UI components, mocked navigation/API data, and the installed headless browser. It does not start Next.js or access real users/providers. Initial desktop assertions passed for show/hide password, the member-only Delete control, body-level dialog mounting, and foreground hit-testing over higher-layer background panels. The run stopped at a retry-field locator check after a simulated submission failure; feedback labels were subsequently changed to explicit label/control associations. A rerun could not launch because automatic permission review timed out. Do not treat the full browser flow as passed.
 
 Remaining checks: verify the latest form's submit/retry flow, exact pasted text in the admin inbox, mobile dialog sizing/menu behavior, keyboard focus, and Delete confirmation in the actual running app. Apply migration 015 only through the normal operator deployment procedure with a backup. PostgreSQL backfill execution, live worker behavior, and shared-host capacity remain unverified.
+
+## Development naming/isolation checks - 2026-11-02
+
+The development files are now `compose.development.yml` and `.env.development.example`; setup creates private `.env.development`. Old examples and active helper/docs references were updated instead of retaining ambiguous default Compose aliases.
+
+- **5 focused tests passed**: temporary-folder setup generates distinct credentials without printing them, preserves legacy/production files and existing development settings, and connectivity discovery selects the explicit development files. Migration/bootstrap ordering checks use the renamed Compose file.
+- Docker Compose parsed both development and production templates. Resolved names showed distinct projects, default networks, volume names, and published host ports. All development published ports are loopback-only; database identity is fixed to `socialscope_dev`; migrations and seed point there. Backend reload, frontend development Dockerfile, same-origin browser API override, runtime resource limits, and one worker process were checked in the resolved configuration.
+- Production Compose/example, both production Dockerfiles, and `backend/app/config.py` were compared with HEAD and are unchanged. Application/runtime logic was not modified.
+- No production/Next build, npm install, container startup, migration execution, volume manipulation, real account creation, or paid provider request was run. Compose parsing does not prove runtime resource enforcement, target-port availability, browser hot reload, or coexistence on the actual VM; these remain target-host acceptance checks.
+
+Focused tests: from `backend/`, run `python -m pytest tests/test_development_setup.py tests/test_migration_bootstrap.py -q`. This machine used the existing `.test-deps` path; no dependencies were installed.

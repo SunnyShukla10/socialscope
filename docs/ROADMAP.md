@@ -7,7 +7,7 @@ This is a proposed sequence, not implemented scope. Start with observed research
 | Local pilot assumption | Why it is acceptable locally | Required change for shared hosting |
 |---|---|---|
 | Individual member/admin accounts with private project ownership | New accounts start empty; admins oversee organization activity | Validate migration backfill and isolation on PostgreSQL |
-| Provider keys in a private .env | Simple administrator-managed installation | Central secret storage with access/rotation/audit procedures |
+| Provider keys in a private .env.development | Simple administrator-managed installation | Central secret storage with access/rotation/audit procedures |
 | Each install enforces its own pull limits | Limits one test workflow | Shared provider-account and workspace ceilings across all users/processes |
 | Process-local provider rate controls, one worker | Keeps one process's activity predictable | Distributed account-level rate/concurrency control before adding workers |
 | HTTP bound to loopback | No direct public service exposure | TLS reverse proxy, trusted origins, secure sessions, security updates |

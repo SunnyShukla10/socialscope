@@ -1,6 +1,6 @@
 # SocialScope API, version 0.1.0
 
-Interactive schema: `http://localhost:8002/api/docs`; JSON: `/api/openapi.json`. Except health, login, and query-limit metadata, application endpoints require `Authorization: Bearer <token>`. Examples use placeholders, never real credentials. The browser reaches `/api` through Next's proxy. The URLs here use default ports; [Ports and configuration](docs/PORTS_AND_CONFIGURATION.md) explains overrides. This reference was checked against the code on September 30, 2026; it does not assert that live provider behavior has been verified.
+Interactive schema: `http://localhost:8102/api/docs`; JSON: `/api/openapi.json`. Except health, login, and query-limit metadata, application endpoints require `Authorization: Bearer <token>`. Examples use placeholders, never real credentials. The browser reaches `/api` through Next's proxy. The URLs here use default ports; [Ports and configuration](docs/PORTS_AND_CONFIGURATION.md) explains overrides. This reference was checked against the code on September 30, 2026; it does not assert that live provider behavior has been verified.
 
 ## Routes
 
