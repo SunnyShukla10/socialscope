@@ -1,0 +1,144 @@
+# Standalone VM configuration. Do not merge with docker-compose.yml.
+# Requires private .env.production and pre-existing, verified data volumes.
+name: socialscope
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-backend: &backend
+  # All Python services run exactly the same packaged release.
+  image: ${SOCIALSCOPE_IMAGE_PREFIX:-socialscope}-backend:${SOCIALSCOPE_RELEASE:?Set a unique release tag}
+  env_file: .env.production
+  environment: &backend-environment
+    DATABASE_URL: ${DATABASE_URL:?Set the internal PostgreSQL connection URL}
+    REDIS_URL: redis://redis:6379/0
+    SECRET_KEY: ${SECRET_KEY:?Set a strong production signing secret}
+    CORS_ORIGINS: ${SOCIALSCOPE_PUBLIC_ORIGIN:?Set the planned HTTPS origin}
+    BUILD_ID: ${SOCIALSCOPE_RELEASE:?Set a unique release tag}
+  logging: *logging
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-socialscope}
+      POSTGRES_DB: ${POSTGRES_DB:-socialscope}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set the existing database password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    logging: *logging
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+    logging: *logging
+
+  migrate:
+    <<: *backend
+    command: alembic upgrade head
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  # Deliberate initial provisioning only; excluded from normal startup.
+  seed:
+    <<: *backend
+    profiles: [bootstrap]
+    command: python -m app.seed
+    environment:
+      <<: *backend-environment
+      LOCAL_ADMIN_EMAIL: ${LOCAL_ADMIN_EMAIL:?Set the initial administrator email}
+      LOCAL_ADMIN_PASSWORD: ${LOCAL_ADMIN_PASSWORD:?Set a unique initial administrator password}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
+  backend:
+    <<: *backend
+    build:
+      context: ./backend
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8001
+    volumes:
+      - export_data:/tmp/socialscope_exports
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import json,urllib.request; r=json.load(urllib.request.urlopen('http://127.0.0.1:8001/api/health',timeout=3)); assert r.get('database') and r.get('redis')"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
+  worker:
+    <<: *backend
+    command: celery -A app.workers.celery_app worker -l info -Q collection,default,celery
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  scheduler:
+    <<: *backend
+    command: celery -A app.workers.celery_app beat -l info --schedule=/tmp/celerybeat-schedule
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    image: ${SOCIALSCOPE_IMAGE_PREFIX:-socialscope}-frontend:${SOCIALSCOPE_RELEASE:?Set a unique release tag}
+    build:
+      context: ./frontend
+    # Only a reverse proxy on this VM can reach this published port.
+    ports:
+      - "127.0.0.1:${SOCIALSCOPE_WEB_PORT:-3002}:3001"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3001/"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+    logging: *logging
+
+volumes:
+  # External volumes must exist: never silently initialize a different database.
+  postgres_data:
+    external: true
+    name: ${SOCIALSCOPE_POSTGRES_VOLUME:?Set the verified existing PostgreSQL volume name}
+  redis_data:
+    external: true
+    name: ${SOCIALSCOPE_REDIS_VOLUME:?Set the verified existing Redis volume name}
+  export_data:
+    external: true
+    name: ${SOCIALSCOPE_EXPORT_VOLUME:?Set the verified existing export volume name}
