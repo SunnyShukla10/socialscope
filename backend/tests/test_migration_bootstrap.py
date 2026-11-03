@@ -13,7 +13,7 @@ def test_runtime_code_never_creates_schema_outside_alembic():
 
 
 def test_compose_runs_migrations_before_seed_and_backend():
-    compose = (PROJECT_ROOT / "docker-compose.yml").read_text()
+    compose = (PROJECT_ROOT / "compose.development.yml").read_text()
     seed_block = compose.split("  seed:\n", 1)[1].split("\n  backend:\n", 1)[0]
     backend_block = compose.split("  backend:\n", 1)[1].split("\n  worker:\n", 1)[0]
 
@@ -21,7 +21,7 @@ def test_compose_runs_migrations_before_seed_and_backend():
     assert "command: alembic upgrade head" in compose
     assert "migrate:" in seed_block
     assert "condition: service_completed_successfully" in seed_block
-    assert "migrate:" in backend_block
+    assert "seed:" in backend_block
     assert "condition: service_completed_successfully" in backend_block
     assert compose.index("  migrate:\n") < compose.index("  seed:\n")
     assert compose.index("  migrate:\n") < compose.index("  backend:\n")

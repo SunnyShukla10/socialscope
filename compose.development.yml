@@ -1,0 +1,148 @@
+# Standalone development stack. Never merge with compose.production.yml.
+# Always use: docker compose --env-file .env.development -f compose.development.yml ...
+name: socialscope-dev
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "5m"
+    max-file: "2"
+
+x-backend: &backend
+  build: ./backend
+  env_file: .env.development
+  environment: &backend-environment
+    # Fixed development-only database identity; do not copy a production URL.
+    DATABASE_URL: postgresql+asyncpg://socialscope_dev:${SOCIALSCOPE_DEV_DB_PASSWORD:?Run python scripts/setup.py}@postgres:5432/socialscope_dev
+    REDIS_URL: redis://redis:6379/0
+    SECRET_KEY: ${SECRET_KEY:?Run python scripts/setup.py}
+    LOCAL_ADMIN_EMAIL: ${LOCAL_ADMIN_EMAIL:-admin@socialscope-dev.local}
+    LOCAL_ADMIN_PASSWORD: ${LOCAL_ADMIN_PASSWORD:?Run python scripts/setup.py}
+    CORS_ORIGINS: "http://localhost:${SOCIALSCOPE_WEB_PORT:-3102},http://127.0.0.1:${SOCIALSCOPE_WEB_PORT:-3102}"
+    BUILD_ID: development
+    COLLECTION_WORKER_CONCURRENCY: "1"
+  volumes:
+    - ./backend:/app
+  mem_limit: 768m
+  cpus: 0.5
+  logging: *logging
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_USER: socialscope_dev
+      POSTGRES_PASSWORD: ${SOCIALSCOPE_DEV_DB_PASSWORD:?Run python scripts/setup.py}
+      POSTGRES_DB: socialscope_dev
+    ports:
+      - "127.0.0.1:${SOCIALSCOPE_POSTGRES_PORT:-5534}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U socialscope_dev -d socialscope_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    mem_limit: 512m
+    cpus: 0.25
+    logging: *logging
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    ports:
+      - "127.0.0.1:${SOCIALSCOPE_REDIS_PORT:-6481}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    mem_limit: 128m
+    cpus: 0.1
+    logging: *logging
+
+  migrate:
+    <<: *backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: alembic upgrade head
+    restart: "no"
+
+  seed:
+    <<: *backend
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    command: python -m app.seed
+    restart: "no"
+
+  backend:
+    <<: *backend
+    ports:
+      - "127.0.0.1:${SOCIALSCOPE_API_PORT:-8102}:8001"
+    volumes:
+      - ./backend:/app
+      - export_data:/tmp/socialscope_exports
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8001 --reload
+    healthcheck:
+      test: ["CMD", "python", "-c", "import json,urllib.request; r=json.load(urllib.request.urlopen('http://127.0.0.1:8001/api/health',timeout=3)); assert r.get('database') and r.get('redis')"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  worker:
+    <<: *backend
+    depends_on:
+      backend:
+        condition: service_healthy
+    command: celery -A app.workers.celery_app worker -l info -Q collection,default,celery --concurrency=1
+
+  scheduler:
+    <<: *backend
+    depends_on:
+      backend:
+        condition: service_healthy
+    command: celery -A app.workers.celery_app beat -l info --schedule=/tmp/celerybeat-schedule
+    mem_limit: 256m
+    cpus: 0.1
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.development
+    environment:
+      NODE_ENV: development
+      NEXT_TELEMETRY_DISABLED: "1"
+      NODE_OPTIONS: --max-old-space-size=1024
+      API_INTERNAL_URL: http://backend:8001
+      # Override any old frontend/.env.local URL: browser requests stay on this stack.
+      NEXT_PUBLIC_API_URL: ""
+    ports:
+      - "127.0.0.1:${SOCIALSCOPE_WEB_PORT:-3102}:3001"
+    volumes:
+      - ./frontend:/app
+      - frontend_dependencies:/app/node_modules
+      - frontend_cache:/app/.next
+    depends_on:
+      backend:
+        condition: service_healthy
+    mem_limit: 2g
+    cpus: 0.75
+    logging: *logging
+
+volumes:
+  # Compose prefixes each name with socialscope-dev. No production volumes here.
+  postgres_data:
+  redis_data:
+  export_data:
+  frontend_dependencies:
+  frontend_cache:

@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 def published_url(service, container_port):
     result = subprocess.run(
-        ["docker", "compose", "port", service, str(container_port)],
+        ["docker", "compose", "--env-file", ".env.development", "-f", "compose.development.yml", "port", service, str(container_port)],
         cwd=ROOT, capture_output=True, text=True, timeout=15, check=True,
     )
     address = result.stdout.strip().splitlines()[0]
