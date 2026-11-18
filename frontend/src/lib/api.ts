@@ -388,7 +388,9 @@ export async function fetchApi<T>(
     headers,
   })
 
-  if (response.status === 401) {
+  // Rejected credentials belong to the login form's inline error handling.
+  // Only protected requests should clear an expired session and navigate away.
+  if (response.status === 401 && path !== '/auth/login') {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('socialscope_token')
       window.location.href = '/login'

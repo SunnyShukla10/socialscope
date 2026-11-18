@@ -57,6 +57,29 @@ test('a confirmed unauthorized session clears the token and redirects', async ()
   assert.equal(app.timers.size, 0)
 })
 
+test('wrong login credentials show the server error without navigating and allow retry', async () => {
+  let attempts = 0
+  const app = setup(async (_url, options) => {
+    attempts += 1
+    const credentials = JSON.parse(options.body)
+    assert.equal(credentials.email, 'user@example.com')
+    if (credentials.password === 'correct-password') {
+      return new Response(JSON.stringify({ access_token: 'new-session', token_type: 'bearer' }))
+    }
+    return new Response(JSON.stringify({ detail: 'Invalid email or password' }), { status: 401 })
+  })
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    await assert.rejects(app.exports.login('user@example.com', 'wrong-password'),
+      (error) => error.status === 401 && error.message === 'Invalid email or password')
+    assert.equal(app.window.location.href, '')
+    assert.equal(app.storage.get('socialscope_token'), 'existing-session')
+  }
+  const result = await app.exports.login('user@example.com', 'correct-password')
+  assert.equal(result.access_token, 'new-session')
+  assert.equal(attempts, 3)
+  assert.equal(app.window.location.href, '')
+})
+
 test('timeout also covers a response body that stalls after headers arrive', async () => {
   let readingBody
   const started = new Promise((resolve) => { readingBody = resolve })
