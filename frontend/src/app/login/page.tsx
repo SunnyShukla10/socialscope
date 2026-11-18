@@ -5,12 +5,13 @@ import { useRouter } from 'next/navigation'
 import { login } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Radio, BarChart2, Search, Users } from 'lucide-react'
+import { Radio, BarChart2, Search, Users, Eye, EyeOff } from 'lucide-react'
 
 export default function LoginPage() {
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -141,11 +142,25 @@ export default function LoginPage() {
             />
             <Input
               label="Password"
-              type="password"
+              id="login-password"
+              className="pr-12"
+              type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={(e) => { setPassword(e.target.value); setError('') }}
               placeholder="••••••••"
               autoComplete="current-password"
+              rightIcon={
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(value => !value)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  aria-pressed={showPassword}
+                  aria-controls="login-password"
+                  className="flex h-8 w-8 items-center justify-center rounded text-text-muted hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                >
+                  {showPassword ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+                </button>
+              }
               required
             />
 
