@@ -5,7 +5,8 @@ import uuid
 
 from app.config import settings
 from app.database import get_db
-from app.schemas.activity import ActivityEventOut
+from app.schemas.activity import (ActivityEventOut, ActivityCleanupSelection, ActivityCleanupRequest,
+                                  ActivityCleanupPreview, ActivityCleanupResult)
 from app.schemas.admin import AdminOverview, ApiKeyStatus
 from app.services.activity_service import ActivityService
 from app.services.auth_service import AuthService
@@ -55,6 +56,20 @@ async def audit_log(
     current_user=Depends(require_admin),
 ):
     return await ActivityService(db).latest(current_user.organization_id, limit=limit, offset=offset, user_id=user_id)
+
+
+@router.post("/audit-log/cleanup-preview", response_model=ActivityCleanupPreview)
+async def preview_activity_cleanup(body: ActivityCleanupSelection,
+                                   db: AsyncSession = Depends(get_db), admin=Depends(require_admin)):
+    count = await ActivityService(db).cleanup_count(admin.organization_id, body.before, body.user_id)
+    return ActivityCleanupPreview(**body.model_dump(), matching_count=count)
+
+
+@router.delete("/audit-log", response_model=ActivityCleanupResult)
+async def cleanup_activity(body: ActivityCleanupRequest,
+                           db: AsyncSession = Depends(get_db), admin=Depends(require_admin)):
+    count = await ActivityService(db).cleanup(admin, body.before, body.user_id)
+    return ActivityCleanupResult(deleted_count=count)
 
 
 @router.get("/overview", response_model=AdminOverview)

@@ -1,5 +1,14 @@
 # SocialScope API, version 0.1.0
 
+## Administration: activity cleanup
+
+Both routes below require an active administrator and always use that account's organization. An optional `user_id` filters the event actor; omitting it includes system/unattributed events. They operate across matching history, not just one listing page. No schema migration is required.
+
+- `POST /api/admin/audit-log/cleanup-preview`: JSON `{ "before": "2026-08-01T00:00:00Z", "user_id": null }`. Returns `{ "before": "...", "user_id": null, "matching_count": 42 }` without deleting anything.
+- `DELETE /api/admin/audit-log`: JSON `{ "before": "2026-08-01T00:00:00Z", "user_id": null, "confirmation": "DELETE" }`. Returns `{ "deleted_count": 42 }`. Requires the exact confirmation value and rejects extra fields. The cutoff must be timezone-aware and in the past; only entries strictly before it are removed.
+
+Cleanup inserts an `activity_history_deleted` event containing the administrator identity, cutoff, optional actor filter, and deletion count. Deletion and that audit insert commit or roll back together. Preview counts may change before execution. Only activity rows are removed; user accounts, projects, posts, and feedback remain. Invalid bodies return 422, and non-admin callers return 403. Deployment requires the matching frontend and API.
+
 Interactive schema: `http://localhost:8102/api/docs`; JSON: `/api/openapi.json`. Except health, login, and query-limit metadata, application endpoints require `Authorization: Bearer <token>`. Examples use placeholders, never real credentials. The browser reaches `/api` through Next's proxy. The URLs here use default ports; [Ports and configuration](docs/PORTS_AND_CONFIGURATION.md) explains overrides. This reference was checked against the code on September 30, 2026; it does not assert that live provider behavior has been verified.
 
 ## Routes

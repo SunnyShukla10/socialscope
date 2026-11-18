@@ -1,7 +1,8 @@
 import uuid
+from datetime import datetime
 from typing import Any, Optional
 
-from sqlalchemy import select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.activity_event import ActivityEvent
@@ -53,6 +54,30 @@ class ActivityService:
             .limit(limit)
         )
         return list(result.scalars().all())
+
+    @staticmethod
+    def cleanup_conditions(organization_id: uuid.UUID, before: datetime, user_id: uuid.UUID | None):
+        conditions = [ActivityEvent.organization_id == organization_id, ActivityEvent.created_at < before]
+        if user_id is not None:
+            conditions.append(ActivityEvent.actor_user_id == user_id)
+        return conditions
+
+    async def cleanup_count(self, organization_id: uuid.UUID, before: datetime,
+                            user_id: uuid.UUID | None = None) -> int:
+        return await self.db.scalar(select(func.count()).select_from(ActivityEvent).where(
+            *self.cleanup_conditions(organization_id, before, user_id))) or 0
+
+    async def cleanup(self, actor: User, before: datetime, user_id: uuid.UUID | None = None) -> int:
+        result = await self.db.execute(delete(ActivityEvent).where(
+            *self.cleanup_conditions(actor.organization_id, before, user_id))
+            .execution_options(synchronize_session=False))
+        deleted_count = result.rowcount
+        await self.log(organization_id=actor.organization_id, actor=actor,
+            action="activity_history_deleted", target_type="activity_history",
+            target_label="Activity history cleanup",
+            metadata={"deleted_count": deleted_count, "before": before.isoformat(),
+                      "user_id": str(user_id) if user_id else None})
+        return deleted_count
 
     async def collection_outcome(self, job):
         """Record one terminal outcome per locked job, in the outcome transaction."""

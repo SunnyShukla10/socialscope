@@ -1,5 +1,17 @@
 # SocialScope tests and validation
 
+## Admin workspace and activity cleanup - 2026-11-17
+
+Seven focused API cleanup tests passed using isolated SQLite fixtures. An earlier combined run of cleanup, pilot-account, and private-account tests passed 26 tests; the seventh cleanup case was added afterward and the seven-case suite passed. Coverage includes authenticated admin access, organization/person scoping, strict cutoff behavior, malformed/timezone-naive/future cutoffs, explicit confirmation, read-only preview, repeated deletion, retained projects/feedback, audit attribution, and rollback if the audit insert fails. These checks do not execute against a hosted PostgreSQL database.
+
+Reproduce from `backend/` in an environment with the declared dependencies installed:
+
+```bash
+python -m pytest tests/test_activity_cleanup.py tests/test_pilot_accounts.py tests/test_private_accounts.py -q
+```
+
+TypeScript checking and editor diagnostics passed. Browser checks used the actual local Next.js admin route with all API responses mocked. DOM-event flows covered create-user errors and successful retry, password visibility and clearing, person navigation, cleanup preview/cancel/confirmation, cleanup retry, refresh, feedback details, focus entering the dialog, and a 390-pixel viewport without page/main horizontal overflow. Normal pointer automation timed out because the integrated preview document stayed hidden; physical mouse, full keyboard navigation, and deployed PostgreSQL acceptance remain manual checks. No real users or activity were created/deleted by this validation. No production build or deployment was run.
+
 ## Recorded implementation validation (September 28-29, 2026)
 
 This is the original implementation record, not a new test run on the recipient's machine. Documentation was reviewed against the code and Compose configuration on September 30, 2026. The documentation review did not rerun application tests or establish that the earlier Docker/disk issues still occur. It did verify the current and example alternate Compose port mappings/CORS, local documentation links, and PowerShell syntax for the command examples without executing those examples.
