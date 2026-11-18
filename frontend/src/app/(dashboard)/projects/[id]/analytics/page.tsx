@@ -78,7 +78,7 @@ function CoOccurrenceNetwork({ wordMap }: { wordMap: WordMapResponse }) {
                 y1={source.y}
                 x2={target.x}
                 y2={target.y}
-                stroke="#20808D"
+                stroke="#4F46E5"
                 strokeOpacity={0.18 + 0.35 * (weight / maxEdgeWeight)}
                 strokeWidth={1 + 4 * (weight / maxEdgeWeight)}
               >
@@ -101,7 +101,7 @@ function CoOccurrenceNetwork({ wordMap }: { wordMap: WordMapResponse }) {
           const label = node.label || node.id
           return (
             <g key={node.id}>
-              <circle cx={pos.x} cy={pos.y} r={r} fill="#20808D" opacity={0.9}>
+              <circle cx={pos.x} cy={pos.y} r={r} fill="#4F46E5" opacity={0.9}>
                 <title>{`${label}: ${value.toLocaleString()}`}</title>
               </circle>
               <text
@@ -112,7 +112,7 @@ function CoOccurrenceNetwork({ wordMap }: { wordMap: WordMapResponse }) {
                 fill="#252420"
                 className="text-[11px]"
                 paintOrder="stroke"
-                stroke="#F9F8F5"
+                stroke="#FFFFFF"
                 strokeWidth="4"
                 strokeLinecap="round"
                 strokeLinejoin="round"
@@ -221,7 +221,7 @@ export default function AnalyticsPage() {
               layout="vertical"
               margin={{ top: 5, right: 30, left: 50, bottom: 5 }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="#D4D1CA" strokeOpacity={0.6} horizontal={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#D8DEEE" strokeOpacity={0.6} horizontal={false} />
               <XAxis
                 type="number"
                 tick={{ fontSize: 11, fill: '#7A7974' }}
@@ -241,8 +241,8 @@ export default function AnalyticsPage() {
               <Tooltip
                 formatter={(value: number) => [value.toLocaleString(), 'Posts']}
                 contentStyle={{
-                  background: '#F9F8F5',
-                  border: '1px solid #D4D1CA',
+                  background: '#FFFFFF',
+                  border: '1px solid #D8DEEE',
                   borderRadius: 8,
                   fontSize: 12,
                 }}
@@ -272,7 +272,7 @@ export default function AnalyticsPage() {
               layout="vertical"
               margin={{ top: 5, right: 30, left: 100, bottom: 5 }}
             >
-              <CartesianGrid strokeDasharray="3 3" stroke="#D4D1CA" strokeOpacity={0.6} horizontal={false} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#D8DEEE" strokeOpacity={0.6} horizontal={false} />
               <XAxis
                 type="number"
                 tick={{ fontSize: 11, fill: '#7A7974' }}
@@ -292,13 +292,13 @@ export default function AnalyticsPage() {
               <Tooltip
                 formatter={(value: number) => [value.toLocaleString(), 'Posts']}
                 contentStyle={{
-                  background: '#F9F8F5',
-                  border: '1px solid #D4D1CA',
+                  background: '#FFFFFF',
+                  border: '1px solid #D8DEEE',
                   borderRadius: 8,
                   fontSize: 12,
                 }}
               />
-              <Bar dataKey="count" fill="#20808D" radius={[0, 4, 4, 0]} />
+              <Bar dataKey="count" fill="#4F46E5" radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
         )}

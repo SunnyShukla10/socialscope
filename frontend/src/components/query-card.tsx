@@ -28,8 +28,8 @@ const queryTypeConfig = {
   natural_language: {
     icon: Search,
     label: 'Natural language',
-    color: 'text-[#1B474D]',
-    bg: 'bg-[#1B474D]/10',
+    color: 'text-[#312E81]',
+    bg: 'bg-[#312E81]/10',
   },
   boolean: {
     icon: FileText,

@@ -46,7 +46,9 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-background flex">
       {/* Left panel — branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#01696F] to-[#1B474D] flex-col justify-between p-12 relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#101933] via-[#312E81] to-[#5B21B6] flex-col justify-between p-12 relative overflow-hidden">
+        <div aria-hidden="true" className="pointer-events-none absolute -left-24 -top-24 h-96 w-96 rounded-full bg-cyan-400/20 blur-3xl" />
+        <div aria-hidden="true" className="pointer-events-none absolute -bottom-32 -right-24 h-[28rem] w-[28rem] rounded-full bg-violet-400/20 blur-3xl" />
         {/* Background pattern */}
         <div className="absolute inset-0 opacity-10">
           <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
@@ -61,7 +63,7 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div className="relative flex items-center gap-3">
-          <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+          <div className="w-10 h-10 bg-gradient-to-br from-cyan-300/25 to-violet-300/25 border border-white/20 rounded-xl flex items-center justify-center shadow-lg">
             <Radio size={20} className="text-white" />
           </div>
           <div>
@@ -72,8 +74,8 @@ export default function LoginPage() {
 
         {/* Feature list */}
         <div className="relative space-y-6">
-          <h1 className="text-3xl font-bold text-white leading-tight">
-            Social listening<br />for academic research
+          <h1 className="text-4xl font-bold text-white leading-tight tracking-tight">
+            Social listening<br /><span className="text-cyan-200">for academic research</span>
           </h1>
           <div className="space-y-4">
             {[
@@ -94,12 +96,12 @@ export default function LoginPage() {
               },
             ].map((f) => (
               <div key={f.title} className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-white/15 rounded-lg flex items-center justify-center text-white shrink-0 mt-0.5">
+                <div className="w-8 h-8 bg-white/10 border border-white/15 rounded-lg flex items-center justify-center text-cyan-200 shrink-0 mt-0.5">
                   {f.icon}
                 </div>
                 <div>
                   <p className="text-white font-medium text-sm">{f.title}</p>
-                  <p className="text-white/60 text-xs mt-0.5">{f.description}</p>
+                  <p className="text-indigo-100/85 text-xs mt-0.5">{f.description}</p>
                 </div>
               </div>
             ))}
@@ -112,8 +114,8 @@ export default function LoginPage() {
       </div>
 
       {/* Right panel — login form */}
-      <div className="flex-1 flex items-center justify-center p-8">
-        <div className="w-full max-w-sm">
+      <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-indigo-50 via-background to-violet-50 p-5 sm:p-8">
+        <div className="w-full max-w-md rounded-2xl border border-white bg-surface p-6 shadow-[0_24px_80px_-24px_rgba(49,46,129,0.25)] sm:p-10">
           {/* Mobile logo */}
           <div className="lg:hidden flex items-center gap-2.5 mb-8">
             <div className="w-9 h-9 bg-primary rounded-lg flex items-center justify-center">
@@ -173,14 +175,14 @@ export default function LoginPage() {
             <Button
               type="submit"
               loading={loading}
-              className="w-full mt-2"
+              className="w-full mt-2 bg-gradient-to-r from-primary to-violet-600 shadow-lg shadow-indigo-500/20 hover:from-primary-hover hover:to-violet-700"
               size="lg"
             >
               {loading ? 'Signing in...' : 'Sign in'}
             </Button>
           </form>
 
-          <div className="mt-6 rounded-lg border border-primary/15 bg-primary/6 p-4">
+          <div className="mt-6 rounded-xl border border-indigo-100 bg-indigo-50/70 p-4">
             <p className="text-xs font-semibold text-primary">Pilot access</p>
             <p className="mt-2 text-xs text-text-muted">Use the individual account provided by your research administrator. Contact them if you need access or a password reset.</p>
           </div>

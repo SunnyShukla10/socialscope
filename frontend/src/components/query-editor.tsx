@@ -65,7 +65,7 @@ export function QueryEditor({ value, onChange, className }: QueryEditorProps) {
 
   const tokenColors: Record<TokenType, string> = {
     term: 'bg-primary/10 text-primary border-primary/20',
-    phrase: 'bg-[#1B474D]/10 text-[#1B474D] border-[#1B474D]/20',
+    phrase: 'bg-[#312E81]/10 text-[#312E81] border-[#312E81]/20',
     operator: 'bg-[#FFC553]/15 text-[#7A5800] border-[#FFC553]/30',
     paren: 'bg-border/40 text-text-muted border-border',
   }

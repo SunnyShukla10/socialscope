@@ -64,13 +64,13 @@ export function Sidebar({ user }: SidebarProps) {
   const renderSidebarContent = () => (
     <div className="flex flex-col h-full">
       {/* Logo */}
-      <div className="px-5 py-5 border-b border-border">
+      <div className="px-5 py-5 border-b border-border bg-gradient-to-br from-indigo-50 to-violet-50/50">
         <Link
           href="/dashboard"
           className="flex items-center gap-2.5 group"
           onClick={() => setMobileOpen(false)}
         >
-          <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center shrink-0">
+          <div className="w-8 h-8 bg-gradient-to-br from-primary to-violet-600 shadow-md shadow-indigo-500/20 rounded-lg flex items-center justify-center shrink-0">
             <Radio size={16} className="text-white" />
           </div>
           <div>
@@ -92,7 +92,7 @@ export function Sidebar({ user }: SidebarProps) {
             className={cn(
               'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-150',
               isActive(item.href)
-                ? 'bg-primary/10 text-primary'
+                ? 'bg-gradient-to-r from-indigo-100 to-violet-50 text-primary shadow-sm ring-1 ring-inset ring-primary/10'
                 : 'text-text-muted hover:text-text hover:bg-background'
             )}
           >

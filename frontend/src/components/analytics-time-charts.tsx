@@ -10,7 +10,7 @@ import { formatNumber } from '@/lib/utils'
 import { ErrorBox, field } from '@/components/research-ui'
 
 const metrics = {
-  likes: { name: 'Likes', color: '#20808D' },
+  likes: { name: 'Likes', color: '#4F46E5' },
   comments: { name: 'Comments', color: '#A84B2F' },
   shares: { name: 'Shares', color: '#7356A6' },
   views: { name: 'Views', color: '#1DA1F2' },
@@ -18,7 +18,7 @@ const metrics = {
 const dateLabel = (value: string) => new Date(`${value}T00:00:00Z`).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
 const panel = 'rounded-xl border border-border bg-surface p-6'
 const empty = 'flex h-64 items-center justify-center rounded-lg bg-background px-4 text-center text-sm text-text-muted'
-const tooltipStyle = { background: '#F9F8F5', border: '1px solid #D4D1CA', borderRadius: 8, fontSize: 12 }
+const tooltipStyle = { background: '#FFFFFF', border: '1px solid #D8DEEE', borderRadius: 8, fontSize: 12 }
 
 export function AnalyticsTimeCharts({ projectId }: { projectId: string }) {
   const [platform, setPlatform] = useState('')
@@ -135,13 +135,13 @@ export function AnalyticsTimeCharts({ projectId }: { projectId: string }) {
       {loading ? <div role="status" className="h-64 animate-pulse rounded bg-border/20"><span className="sr-only">Loading charts</span></div> : error ? null : !volume.length ? <div className={empty}>No dated posts match this platform and pull.</div> :
         <ResponsiveContainer width="100%" height={350}>
           <LineChart data={volumeChartData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#D4D1CA" strokeOpacity={0.6}/>
+            <CartesianGrid strokeDasharray="3 3" stroke="#D8DEEE" strokeOpacity={0.6}/>
             <XAxis dataKey="date" tickFormatter={dateLabel} tick={{fontSize: 10, fill: '#7A7974'}} tickLine={false} minTickGap={45} interval="preserveStartEnd"/>
             <YAxis allowDecimals={false} tickFormatter={formatNumber} tick={{fontSize: 11, fill: '#7A7974'}} width={48} axisLine={false} tickLine={false}/>
             <Tooltip labelFormatter={dateLabel} formatter={(value: number) => value.toLocaleString()} contentStyle={tooltipStyle}/>
             <Legend wrapperStyle={{fontSize: 12}}/>
             {activePlatforms.map((key, index) => <Line key={key} isAnimationActive={false} type="linear" dataKey={key} name={PLATFORMS[key as keyof typeof PLATFORMS]?.name || key} stroke={PLATFORMS[key as keyof typeof PLATFORMS]?.color || CHART_COLORS[index % CHART_COLORS.length]} strokeWidth={2} dot={startIndex === endIndex} activeDot={{r: 4}}/>) }
-            {timeline.length > 1 && <Brush dataKey="date" height={32} travellerWidth={14} stroke="#20808D" fill="#F9F8F5" tickFormatter={dateLabel} startIndex={startIndex} endIndex={endIndex} onChange={changeZoom} ariaLabel="Volume date range">
+            {timeline.length > 1 && <Brush dataKey="date" height={32} travellerWidth={14} stroke="#4F46E5" fill="#FFFFFF" tickFormatter={dateLabel} startIndex={startIndex} endIndex={endIndex} onChange={changeZoom} ariaLabel="Volume date range">
               <LineChart>{activePlatforms.map((key, index) => <Line key={key} dataKey={key} stroke={PLATFORMS[key as keyof typeof PLATFORMS]?.color || CHART_COLORS[index % CHART_COLORS.length]} dot={false} isAnimationActive={false}/>)}</LineChart>
             </Brush>}
           </LineChart>
@@ -154,14 +154,14 @@ export function AnalyticsTimeCharts({ projectId }: { projectId: string }) {
       {loading ? <div className="h-64 animate-pulse rounded bg-border/20"/> : error ? <div className={empty}>Engagement could not load. Use Retry charts above.</div> : !engagement.metrics.length ? <div className={empty}>No recorded engagement metrics for this platform and pull. Providers may omit metrics or report zero.</div> :
         <ResponsiveContainer width="100%" height={350}>
           <LineChart data={engagementChartData} margin={{top: 5, right: 5, left: 0, bottom: 5}}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#D4D1CA" strokeOpacity={0.6}/>
+            <CartesianGrid strokeDasharray="3 3" stroke="#D8DEEE" strokeOpacity={0.6}/>
             <XAxis dataKey="date" tickFormatter={dateLabel} tick={{fontSize: 10, fill: '#7A7974'}} tickLine={false} minTickGap={45} interval="preserveStartEnd"/>
             <YAxis yAxisId="interactions" hide={!engagement.metrics.some(metric => metric !== 'views')} allowDecimals={false} tickFormatter={formatNumber} tick={{fontSize: 11, fill: '#7A7974'}} width={48} axisLine={false} tickLine={false}/>
             <YAxis yAxisId="views" orientation="right" hide={!engagement.metrics.includes('views')} allowDecimals={false} tickFormatter={formatNumber} tick={{fontSize: 11, fill: '#1DA1F2'}} width={48} axisLine={false} tickLine={false}/>
             <Tooltip labelFormatter={dateLabel} formatter={(value: number) => value.toLocaleString()} contentStyle={tooltipStyle}/>
             <Legend wrapperStyle={{fontSize: 12}}/>
             {engagement.metrics.map(metric => <Line key={metric} isAnimationActive={false} type="linear" dataKey={metric} name={metrics[metric].name} stroke={metrics[metric].color} yAxisId={metric === 'views' ? 'views' : 'interactions'} strokeWidth={2} dot={startIndex === endIndex} activeDot={{r: 4}}/>)}
-            {timeline.length > 1 && <Brush dataKey="date" height={32} travellerWidth={14} stroke="#20808D" fill="#F9F8F5" tickFormatter={dateLabel} startIndex={startIndex} endIndex={endIndex} onChange={changeZoom} ariaLabel="Engagement date range">
+            {timeline.length > 1 && <Brush dataKey="date" height={32} travellerWidth={14} stroke="#4F46E5" fill="#FFFFFF" tickFormatter={dateLabel} startIndex={startIndex} endIndex={endIndex} onChange={changeZoom} ariaLabel="Engagement date range">
               <LineChart><Line dataKey={engagement.metrics[0]} stroke={metrics[engagement.metrics[0]].color} dot={false} isAnimationActive={false}/></LineChart>
             </Brush>}
           </LineChart>

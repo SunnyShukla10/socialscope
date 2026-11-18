@@ -9,24 +9,24 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: '#F7F6F2',
-        surface: '#F9F8F5',
-        border: '#D4D1CA',
+        background: '#F3F5FC',
+        surface: '#FFFFFF',
+        border: '#D8DEEE',
         text: {
-          DEFAULT: '#28251D',
-          muted: '#7A7974',
+          DEFAULT: '#18213B',
+          muted: '#626D86',
         },
         primary: {
-          DEFAULT: '#01696F',
-          hover: '#0C4E54',
+          DEFAULT: '#4F46E5',
+          hover: '#4338CA',
           foreground: '#FFFFFF',
         },
         chart: {
-          teal: '#20808D',
+          teal: '#4F46E5',
           rust: '#A84B2F',
-          dark: '#1B474D',
-          light: '#BCE2E7',
-          mauve: '#944454',
+          dark: '#312E81',
+          light: '#C7D2FE',
+          mauve: '#7C3AED',
           yellow: '#FFC553',
         },
         platform: {
@@ -47,8 +47,8 @@ const config: Config = {
         DEFAULT: '0.5rem',
       },
       boxShadow: {
-        card: '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04)',
-        'card-hover': '0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04)',
+        card: '0 2px 8px rgba(49,46,129,0.04), 0 1px 2px rgba(24,33,59,0.03)',
+        'card-hover': '0 10px 24px rgba(79,70,229,0.10), 0 2px 6px rgba(24,33,59,0.04)',
       },
     },
   },
