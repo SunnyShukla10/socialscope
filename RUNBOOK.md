@@ -190,87 +190,81 @@ The account form's eye button affects only the password currently being typed; s
 
 Feedback opens from the sidebar above the page, including on mobile. Its optional **Error details** field preserves pasted line breaks and indentation (maximum 20,000 characters). The message remains required. Both fields survive a failed submission. Reports stay private to same-organization admins and show the exact pasted error in a scrollable text block. Ask reporters to remove secrets before submitting; the application does not automatically collect console logs or error responses.
 
-## Production Compose preparation - 2026-11-02 (step 1 only)
+## Production deployment controls - 2026-11-17
 
-`compose.production.yml` is a **standalone** VM configuration. Use `compose.development.yml` and `.env.development` for development. Do not combine them with two `-f` flags: that could bring development source mounts back into the deployment. Production uses project name `socialscope`; development uses `socialscope-dev`. They can coexist in separate source folders with separate ports, storage, and credentials.
+Use standalone [compose.production.yml](compose.production.yml) with private configuration copied from [.env.production.example](.env.production.example). Always supply both production flags. Development remains a separate checkout/project with independent storage. DNS, Nginx, Certbot, private configuration, and target-host acceptance remain operator steps.
 
-### What changes and why
+### Controls and limits
 
-| Setting | Purpose |
-|---|---|
-| No `./backend:/app` mounts | Run the code packaged in the image, unaffected by later source-folder edits. |
-| One tagged backend image | API, collection worker, scheduler, migration, and seed run the same release. |
-| Tagged frontend image | Identify the frontend release as well. |
-| Explicit external data volumes | Reuse verified storage; fail if a configured volume is absent rather than silently create an empty database. |
-| No database/Redis/API published ports | Keep internal services private. |
-| Frontend on `127.0.0.1:3002` by default | Prepare for a reverse proxy on the VM; public HTTPS is not configured yet. |
-| `restart: unless-stopped` | Restart long-running services after exit/reboot, provided Docker starts at boot. It does not automatically restart a merely unhealthy container. |
-| One-shot migration, opt-in seed | Apply pending schema changes; provision an initial admin deliberately rather than on normal startup. |
-| Bounded container logs | Limit each service to three 10 MB Docker log files. |
+Only the frontend publishes a loopback port (3002). Runtime services receive an explicit settings allowlist and a restricted database URL. Only migrate receives the maintenance database URL; only opt-in seed receives initial administrator credentials. There is no whole-file environment injection. Docker image contexts exclude environment files.
 
-### Prepare private configuration later on the VM
+API/worker/frontend limits are 768 MiB and 0.5 CPU each; PostgreSQL is 512 MiB/0.5 CPU, Redis 256 MiB/0.25 CPU, scheduler 256 MiB/0.25 CPU. Migration/seed inherit 768 MiB/0.5 CPU. These are ceilings, not reservations or proven capacity; builds are not limited by these settings. Budget capacity across all three apps on the VM.
 
-Copy `.env.production.example` to `.env.production` and replace every placeholder privately. The example is versionable; `.env.production` remains ignored and is outside both image build contexts.
+Redis uses AOF and a 192 MiB noeviction ceiling: full Redis rejects writes rather than silently evicting queued jobs. Monitor memory and queue failures. The collection worker is fixed to one process because provider limits are process-local; other apps using the same provider account still share external quotas. The worker has a two-minute shutdown grace period. Scheduler state persists in its own volume, initialized with the non-root image user's permissions. Existing incorrectly owned volumes require explicit operator repair.
 
-Always pass **both** `--env-file .env.production` and `-f compose.production.yml`. The first supplies Compose interpolation values; service `env_file` supplies backend runtime configuration. These are different mechanisms, even though they read the same private file here.
+Every long-running service has a health check. Worker checks its own Celery node; scheduler checks its PID (not proof tasks are delivered). Restart policies restart exited processes, not merely unhealthy containers. Logs remain bounded. Monitor externally and test backup/restore.
 
-Set a unique `SOCIALSCOPE_RELEASE` per release, matching the source being packaged. The optional image prefix can include a registry namespace. Do not rebuild/reuse an old release tag with different code. The backend service defines its build; the other Python services reuse that tagged image.
+### New empty installation or previous PostgreSQL container
 
-For existing data, verify volume names on the **actual VM** before deploying. Expected names are `socialscope_postgres_data`, `socialscope_redis_data`, and `socialscope_export_data`, but enter the actual names. Configuration validation does not check whether those volumes exist or contain the right data. Docker's read-only `volume ls`/`volume inspect` commands and current container mount inspection can establish that during deployment preparation. Do not create replacement empty volumes as a workaround for a missing-volume error on an existing installation.
+Starting empty is supported. Inspect the previous SocialScope container's Compose labels and mounts on the VM first. Stop the old SocialScope stack before starting this one: never run two PostgreSQL servers against one data volume. Removing a container does not reset its database volume.
 
-Keep the actual PostgreSQL user/database/password when reusing a database. Setting `POSTGRES_PASSWORD` does not change an already initialized database password. `DATABASE_URL` must use those same credentials and internal host `postgres:5432`; URL-encode special password characters in the URL. Rotate database credentials separately and deliberately, not by guessing new values in this file. For a genuinely new installation, volumes must be explicitly created before startup, then initialized with the chosen credentials.
+For an empty installation, choose new, unused SocialScope volume names in private configuration and explicitly create those three external volumes. This leaves old storage available until the new deployment is verified. Alternatively, reuse verified SocialScope PostgreSQL 16 storage with its actual credentials; existing accounts/schema remain. POSTGRES_PASSWORD does not reset an initialized database password. Do not reuse SocialPulse/LitIQ volumes, remove their containers, or run global prune commands. No container/volume removal is performed by these source changes.
 
-Set a production signing secret and initial admin credentials, and supply provider keys privately. Changing the signing secret invalidates existing browser tokens. Seed preserves existing accounts; the initial admin settings do not reset an existing password. Review intentional provider safeguard customizations when copying configuration; keep worker concurrency conservative.
+### First deployment on the Linux VM
 
-### Validate without starting anything
+Run from this checkout. Privately complete configuration first. POSTGRES_USER/POSTGRES_DB must be socialscope for the guarded role setup below. Generate independent maintenance, runtime, signing, and administrator secrets. POSTGRES_URL_PASSWORD is the URL-encoded maintenance password; APP_DB_URL_PASSWORD encodes the separate runtime password. Remove the obsolete DATABASE_URL entry from any older production configuration.
 
-From `socialscope/` on the target host, after preparing the private configuration:
+Create the three chosen external volumes deliberately before startup. Then:
 
 ```bash
 docker compose --env-file .env.production -f compose.production.yml config --quiet
-```
-
-Do not share full resolved configuration: it contains secrets. For template-only checking before the private file exists, a sufficiently recent Compose supports:
-
-```bash
-docker compose --env-file .env.production.example -f compose.production.yml config --no-env-resolution --quiet
-```
-
-Template placeholders are not real deployment credentials. This command validates structure only; it does not verify secrets, HTTPS, storage, or application readiness.
-
-### Later deployment commands (not executed in step 1)
-
-After backups, volume verification, and scheduling the maintenance window, image preparation will use:
-
-```bash
 docker compose --env-file .env.production -f compose.production.yml build backend frontend
+docker compose --env-file .env.production -f compose.production.yml up -d --wait postgres redis
+docker compose --env-file .env.production -f compose.production.yml --profile maintenance run --rm migrate
 ```
 
-This includes a frontend production build, so run it on the VM when deployment is authorized, not as a light laptop check. If images are built elsewhere, push/pull those same release tags instead. Finish active collections before replacing workers. The operator will then apply migrations and bring up the matching release; normal full-stack startup includes the one-shot migration dependency. Use the production flags consistently for every operational command.
-
-On a new installation only, deliberate initial provisioning can use:
+Do not print full resolved configuration: it contains secrets. Stop if migration fails. The role script requires revision 015 and tables owned by the maintenance user; future releases must use their verified revision.
 
 ```bash
-docker compose --env-file .env.production -f compose.production.yml run --rm seed
+docker compose --env-file .env.production -f compose.production.yml exec -T postgres psql -X -U socialscope -d socialscope -v ON_ERROR_STOP=1 -v database_name=socialscope -v maintenance_role=socialscope -v app_role=socialscope_app -v expected_revision=015 < deploy/postgres/prepare-application-role.sql
+docker compose --env-file .env.production -f compose.production.yml exec postgres psql -X -U socialscope -d socialscope
 ```
 
-The explicit service target enables this profiled service for that command. Normal `up` excludes seed. Existing accounts need no seeding.
+In interactive psql, run the following and enter the runtime password at the hidden prompts. Then exit with backslash-q.
 
-This step adds files and documentation only. No image build, container start/recreation, database migration, account creation, volume creation, or VM deployment was performed. The original local Compose file is unchanged. HTTPS/proxy installation, public-IP configuration, credentials review, backups, and live acceptance remain later steps.
+```text
+SET password_encryption = 'scram-sha-256';
+\password socialscope_app
+```
 
-## Full production environment reference - 2026-11-02
+The transactional role script refuses an existing role, unexpected database, schema head, or ownership. Never drop an existing role to retry; inspect and resume at the appropriate step. It grants table DML and sequence use, removes PUBLIC schema CREATE, denies Alembic revision writes, and prepares future grants for objects created by the maintenance user. It does not change ownership. Runtime cannot administer roles/databases. The maintenance user remains privileged; this is runtime credential separation.
 
-`.env.production.example` now lists every backend setting, except three values deliberately managed by production Compose: `REDIS_URL` is the internal Redis address, `CORS_ORIGINS` comes from `SOCIALSCOPE_PUBLIC_ORIGIN`, and `BUILD_ID` comes from `SOCIALSCOPE_RELEASE`. Editing duplicate entries for those three in a private environment file would not override Compose's explicit environment mapping.
+Verify a real runtime login over TCP with a hidden password prompt:
 
-The example uses `pilot-0.1.0` as the release tag and includes all Xpoz/SociaVault rate, concurrency, timeout, retry, pagination, and recovery settings. It also includes collection concurrency/cancellation, query safeguards, console logging, token expiry, and the existing signing algorithm. These are backend defaults, not claims about the provider plan or measured production throughput.
+```bash
+docker compose --env-file .env.production -f compose.production.yml exec postgres psql -X -h 127.0.0.1 -U socialscope_app -d socialscope -W
+```
 
-To prepare the private file, replace deployment placeholders (origin, credentials, signing secret, and verified volume names), supply provider keys privately, and carry across intentional tested provider/collection overrides from the local environment. Keep database credentials consistent with existing storage. No real environment file was read or modified for this template expansion.
+Paste [verify-application-role.sql](deploy/postgres/verify-application-role.sql), preceded by these psql variables:
 
-The renamed `.env.development.example` now also lists SociaVault request-rate and pagination recovery settings and `ALGORITHM`; earlier local templates left these at code defaults. No application defaults or provider behavior were changed.
+```text
+\set database_name socialscope
+\set app_role socialscope_app
+```
 
-For the initial pilot, leave worker concurrency at 1, logging at INFO, and the existing query/recovery defaults unless an intentional tested override is required. `ACCESS_TOKEN_EXPIRE_MINUTES=1440` means 24 hours; it can be reduced deliberately, but changing it affects newly issued tokens, not tokens already issued. Local-only API/database/Redis published-port variables do not belong in the production file because those services are not published there.
+All checks must pass. DML probes match zero rows and roll back. Then provision the initial admin and start runtime:
 
-After editing a private environment file, running containers do not automatically reload it. Use the planned production update procedure to recreate affected services; changing configuration values alone does not deploy anything. Continue using the configuration-only validation command before deployment.
+```bash
+docker compose --env-file .env.production -f compose.production.yml --profile bootstrap run --rm seed
+docker compose --env-file .env.production -f compose.production.yml up -d --wait backend worker scheduler frontend
+docker compose --env-file .env.production -f compose.production.yml ps --all
+```
+
+Seed preserves existing accounts; it does not reset passwords. Confirm dependency health, login, two-user project isolation, mocked-provider worker delivery, CSV downloads, feedback/admin flows, and restart behavior before inviting users. Configure DNS/Nginx/Certbot for the exact public origin and verify HTTPS. Test backup restoration separately. Health checks alone do not establish production readiness.
+
+### Later releases
+
+Finish active collections, back up and verify storage, build uniquely tagged images, and stop backend/worker/scheduler/frontend before explicit maintenance migrations. Run migrations as the same object owner so default runtime grants apply. Verify schema/permissions before recreating runtime with the matching release. Seed and role creation are first-install steps, not routine startup steps. Never use down -v to update. Retain prior images and a verified backup; a schema change may require restoration rather than only an image rollback.
 
 ## Development / production naming and isolation - 2026-11-02
 

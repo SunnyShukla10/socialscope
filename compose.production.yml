@@ -11,18 +11,60 @@ x-logging: &logging
 x-backend: &backend
   # All Python services run exactly the same packaged release.
   image: ${SOCIALSCOPE_IMAGE_PREFIX:-socialscope}-backend:${SOCIALSCOPE_RELEASE:?Set a unique release tag}
-  env_file: .env.production
   environment: &backend-environment
-    DATABASE_URL: ${DATABASE_URL:?Set the internal PostgreSQL connection URL}
+    DATABASE_URL: postgresql+asyncpg://${APP_DB_USER:?Set restricted application login}:${APP_DB_URL_PASSWORD:?Set URL-encoded application password}@postgres:5432/${POSTGRES_DB:-socialscope}
     REDIS_URL: redis://redis:6379/0
     SECRET_KEY: ${SECRET_KEY:?Set a strong production signing secret}
     CORS_ORIGINS: ${SOCIALSCOPE_PUBLIC_ORIGIN:?Set the planned HTTPS origin}
     BUILD_ID: ${SOCIALSCOPE_RELEASE:?Set a unique release tag}
+    SOCIALVAULT_API_KEY: ${SOCIALVAULT_API_KEY-}
+    XPOZ_API_KEY: ${XPOZ_API_KEY-}
+    OPENAI_API_KEY: ${OPENAI_API_KEY-}
+    XPOZ_REQUESTS_PER_PERIOD: ${XPOZ_REQUESTS_PER_PERIOD-28}
+    XPOZ_RATE_PERIOD_SECONDS: ${XPOZ_RATE_PERIOD_SECONDS-60}
+    XPOZ_MAX_CONCURRENCY: ${XPOZ_MAX_CONCURRENCY-2}
+    XPOZ_OPERATION_TIMEOUT_SECONDS: ${XPOZ_OPERATION_TIMEOUT_SECONDS-300}
+    XPOZ_NO_PROGRESS_TIMEOUT_SECONDS: ${XPOZ_NO_PROGRESS_TIMEOUT_SECONDS-300}
+    XPOZ_MAX_PAGES: ${XPOZ_MAX_PAGES-100}
+    XPOZ_RETRY_TIME_BUDGET_SECONDS: ${XPOZ_RETRY_TIME_BUDGET_SECONDS-60}
+    XPOZ_MAX_REPEATED_502: ${XPOZ_MAX_REPEATED_502-2}
+    SOCIALVAULT_MAX_CONCURRENCY: ${SOCIALVAULT_MAX_CONCURRENCY-5}
+    SOCIALVAULT_REQUESTS_PER_PERIOD: ${SOCIALVAULT_REQUESTS_PER_PERIOD-8}
+    SOCIALVAULT_RATE_PERIOD_SECONDS: ${SOCIALVAULT_RATE_PERIOD_SECONDS-1}
+    SOCIALVAULT_REQUEST_TIMEOUT_SECONDS: ${SOCIALVAULT_REQUEST_TIMEOUT_SECONDS-30}
+    SOCIALVAULT_NO_PROGRESS_TIMEOUT_SECONDS: ${SOCIALVAULT_NO_PROGRESS_TIMEOUT_SECONDS-120}
+    SOCIALVAULT_MAX_PAGES: ${SOCIALVAULT_MAX_PAGES-100}
+    SOCIALVAULT_RETRY_TIME_BUDGET_SECONDS: ${SOCIALVAULT_RETRY_TIME_BUDGET_SECONDS-60}
+    SOCIALVAULT_MAX_REPEATED_502: ${SOCIALVAULT_MAX_REPEATED_502-3}
+    SOCIALVAULT_PAGINATION_404_RETRIES: ${SOCIALVAULT_PAGINATION_404_RETRIES-1}
+    SOCIALVAULT_EARLY_RESTART_MAX_PAGES: ${SOCIALVAULT_EARLY_RESTART_MAX_PAGES-5}
+    SOCIALVAULT_EARLY_RESTART_MAX_TARGET_RATIO: ${SOCIALVAULT_EARLY_RESTART_MAX_TARGET_RATIO-0.3}
+    COLLECTION_CANCELLATION_POLL_SECONDS: ${COLLECTION_CANCELLATION_POLL_SECONDS-1}
+    COLLECTION_ABANDONED_JOB_STALE_SECONDS: ${COLLECTION_ABANDONED_JOB_STALE_SECONDS-900}
+    COLLECTION_ABANDONED_RECONCILE_INTERVAL_SECONDS: ${COLLECTION_ABANDONED_RECONCILE_INTERVAL_SECONDS-60}
+    COLLECTION_ABANDONED_INSPECT_TIMEOUT_SECONDS: ${COLLECTION_ABANDONED_INSPECT_TIMEOUT_SECONDS-1}
+    COLLECTION_ABANDONED_RECONCILE_BATCH_SIZE: ${COLLECTION_ABANDONED_RECONCILE_BATCH_SIZE-100}
+    PROVIDER_MAX_RETRIES: ${PROVIDER_MAX_RETRIES-3}
+    PROVIDER_RETRY_BASE_SECONDS: ${PROVIDER_RETRY_BASE_SECONDS-1}
+    PROVIDER_RETRY_MAX_SECONDS: ${PROVIDER_RETRY_MAX_SECONDS-30}
+    COLLECTION_WORKER_CONCURRENCY: "1"
+    QUERY_SAFE_DEFAULT_MAX_LENGTH: ${QUERY_SAFE_DEFAULT_MAX_LENGTH-200}
+    XPOZ_QUERY_MAX_LENGTH: ${XPOZ_QUERY_MAX_LENGTH-200}
+    SOCIALVAULT_QUERY_MAX_LENGTH: ${SOCIALVAULT_QUERY_MAX_LENGTH-200}
+    QUERY_LENGTH_WARNING_RATIO: ${QUERY_LENGTH_WARNING_RATIO-0.8}
+    LOG_LEVEL: ${LOG_LEVEL-INFO}
+    ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES-1440}
+    ALGORITHM: ${ALGORITHM-HS256}
+  init: true
+  mem_limit: 768m
+  cpus: 0.5
   logging: *logging
 
 services:
   postgres:
     image: pgvector/pgvector:pg16
+    mem_limit: 512m
+    cpus: 0.5
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-socialscope}
       POSTGRES_DB: ${POSTGRES_DB:-socialscope}
@@ -39,7 +81,9 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: redis-server --appendonly yes
+    mem_limit: 256m
+    cpus: 0.25
+    command: redis-server --appendonly yes --maxmemory 192mb --maxmemory-policy noeviction
     volumes:
       - redis_data:/data
     healthcheck:
@@ -52,6 +96,9 @@ services:
 
   migrate:
     <<: *backend
+    profiles: [maintenance]
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-socialscope}:${POSTGRES_URL_PASSWORD:?Set URL-encoded maintenance password}@postgres:5432/${POSTGRES_DB:-socialscope}
     command: alembic upgrade head
     depends_on:
       postgres:
@@ -68,8 +115,8 @@ services:
       LOCAL_ADMIN_EMAIL: ${LOCAL_ADMIN_EMAIL:?Set the initial administrator email}
       LOCAL_ADMIN_PASSWORD: ${LOCAL_ADMIN_PASSWORD:?Set a unique initial administrator password}
     depends_on:
-      migrate:
-        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
     restart: "no"
 
   backend:
@@ -80,8 +127,8 @@ services:
     volumes:
       - export_data:/tmp/socialscope_exports
     depends_on:
-      migrate:
-        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
@@ -98,7 +145,14 @@ services:
 
   worker:
     <<: *backend
-    command: celery -A app.workers.celery_app worker -l info -Q collection,default,celery
+    command: celery -A app.workers.celery_app worker -l info -Q collection,default,celery --concurrency=1 --hostname=worker@%h
+    stop_grace_period: 2m
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.workers.celery_app inspect ping --destination worker@$$HOSTNAME --timeout 3 | grep -q pong"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     depends_on:
       backend:
         condition: service_healthy
@@ -106,7 +160,17 @@ services:
 
   scheduler:
     <<: *backend
-    command: celery -A app.workers.celery_app beat -l info --schedule=/tmp/celerybeat-schedule
+    command: celery -A app.workers.celery_app beat -l info --schedule=/data/celerybeat-schedule --pidfile=/tmp/celerybeat.pid
+    mem_limit: 256m
+    cpus: 0.25
+    volumes:
+      - scheduler_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", 'test -s /tmp/celerybeat.pid && kill -0 "$$(cat /tmp/celerybeat.pid)"']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     depends_on:
       backend:
         condition: service_healthy
@@ -116,6 +180,9 @@ services:
     image: ${SOCIALSCOPE_IMAGE_PREFIX:-socialscope}-frontend:${SOCIALSCOPE_RELEASE:?Set a unique release tag}
     build:
       context: ./frontend
+    init: true
+    mem_limit: 768m
+    cpus: 0.5
     # Only a reverse proxy on this VM can reach this published port.
     ports:
       - "127.0.0.1:${SOCIALSCOPE_WEB_PORT:-3002}:3001"
@@ -123,7 +190,7 @@ services:
       backend:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3001/"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3001/login').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
       timeout: 3s
       retries: 12
@@ -142,3 +209,5 @@ volumes:
   export_data:
     external: true
     name: ${SOCIALSCOPE_EXPORT_VOLUME:?Set the verified existing export volume name}
+
+  scheduler_data: {}

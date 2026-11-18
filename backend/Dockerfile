@@ -5,8 +5,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 RUN addgroup --system --gid 10001 socialscope \
     && adduser --system --uid 10001 --ingroup socialscope --home /home/socialscope socialscope \
-    && mkdir -p /tmp/socialscope_exports \
-    && chown -R socialscope:socialscope /app /tmp/socialscope_exports
+    && mkdir -p /tmp/socialscope_exports /data \
+    && chown -R socialscope:socialscope /app /tmp/socialscope_exports /data
 
 COPY --chown=socialscope:socialscope . .
 

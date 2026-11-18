@@ -28,7 +28,7 @@ python scripts/check-connectivity.py
 
 Setup generates independent database, signing, and admin secrets and leaves provider keys blank. It never overwrites an existing `.env.development`, legacy `.env`, or production configuration. Migrations precede seed, seed precedes API readiness, and the frontend waits for the healthy API. Migration/seed exit code 0 is normal.
 
-Because filenames are explicit, always use both flags. `--env-file` supplies Compose interpolation; service `env_file` supplies runtime values. Exported shell variables can override interpolation, including project identity and host ports; check for unintended overrides. Never share full resolved Compose output because it includes credentials. `config --quiet` avoids printing them.
+Because filenames are explicit, always use both flags. `--env-file` supplies Compose interpolation; development service `env_file` supplies runtime values; production uses an explicit environment allowlist and separate maintenance/runtime database credentials. Exported shell variables can override interpolation, including project identity and host ports; check for unintended overrides. Never share full resolved Compose output because it includes credentials. `config --quiet` avoids printing them.
 
 ## Read-only connectivity checks
 
