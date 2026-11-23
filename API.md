@@ -42,7 +42,7 @@ Recruitment, flag/suppress, routine post DELETE, enrichment, and paid analytics-
 
 ## Health and authentication
 
-`GET /api/health` returns `status`, `database`, and `redis`. Healthy output is `{"status":"ok","database":true,"redis":true}`. A degraded result still returns HTTP 200, so callers must inspect these fields.
+`GET /api/health` returns `status`, `database`, and `redis`. Healthy output is `{"status":"ok","database":true,"redis":true}` with HTTP 200. A failed or timed-out dependency probe returns HTTP 503 with `status: degraded`; inspect the dependency booleans to identify the failure.
 
 Login accepts `{"email":"<your email>","password":"<your password>"}` and returns `access_token` and `token_type`. Send the token in the Authorization header, never in a URL. Use the privately configured local login; do not put real credentials into examples or shared logs. Interactive API docs and OpenAPI metadata are also publicly readable locally.
 

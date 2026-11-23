@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 from app.database import AsyncSessionLocal, engine
 from app.models.user import User
 from app.models.organization import Organization
-from app.schemas.pilot import MemberCreate, validate_password
+from app.schemas.administration import MemberCreate, validate_password
 from app.services.user_service import lock_organization, reset_password
 
 
@@ -20,7 +20,7 @@ async def ensure_admin(db, *, email, password, organization_slug="local",
     payload = MemberCreate(email=email, full_name=full_name, password=password)
     org = await db.scalar(select(Organization).where(Organization.slug == organization_slug))
     if not org:
-        org = Organization(slug=organization_slug, name=organization_name, plan="pilot")
+        org = Organization(slug=organization_slug, name=organization_name)
         db.add(org)
         await db.flush()
     user = User(organization_id=org.id, email=payload.email, full_name=payload.full_name,

@@ -12,7 +12,7 @@ from app.services.activity_service import ActivityService
 from app.services.auth_service import AuthService
 from app.models.user import User
 from app.models.feedback import Feedback
-from app.schemas.pilot import MemberCreate, AdminUserOut, UserStatus, FeedbackOut, FeedbackReview
+from app.schemas.administration import MemberCreate, AdminUserOut, UserStatus, FeedbackOut, FeedbackReview
 from app.services.user_service import create_member, set_user_status, delete_member
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])

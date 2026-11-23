@@ -12,6 +12,7 @@ x-backend: &backend
   # All Python services run exactly the same packaged release.
   image: ${SOCIALSCOPE_IMAGE_PREFIX:-socialscope}-backend:${SOCIALSCOPE_RELEASE:?Set a unique release tag}
   environment: &backend-environment
+    ENV: production
     DATABASE_URL: postgresql+asyncpg://${APP_DB_USER:?Set restricted application login}:${APP_DB_URL_PASSWORD:?Set URL-encoded application password}@postgres:5432/${POSTGRES_DB:-socialscope}
     REDIS_URL: redis://redis:6379/0
     SECRET_KEY: ${SECRET_KEY:?Set a strong production signing secret}

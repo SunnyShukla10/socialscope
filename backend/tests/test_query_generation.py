@@ -1,11 +1,11 @@
 """Tests for LLM query generation — pure unit tests, no DB needed."""
 import pytest
-from app.adapters.llm_adapter import MockLLMAdapter, _extract_keywords
+from app.adapters.llm_adapter import LocalQueryAdapter, _extract_keywords
 
 
 @pytest.mark.asyncio
-async def test_mock_llm_adapter_health_domain():
-    adapter = MockLLMAdapter()
+async def test_local_query_adapter_health_domain():
+    adapter = LocalQueryAdapter()
     results = await adapter.generate_boolean_queries(
         "How do patients discuss Ubrelvy for migraine treatment?",
         "health",
@@ -32,8 +32,8 @@ async def test_mock_llm_adapter_health_domain():
 
 
 @pytest.mark.asyncio
-async def test_mock_llm_adapter_consumer_domain():
-    adapter = MockLLMAdapter()
+async def test_local_query_adapter_consumer_domain():
+    adapter = LocalQueryAdapter()
     results = await adapter.generate_boolean_queries(
         "What are EV owners saying about charging station reliability?",
         "consumer",
@@ -47,8 +47,8 @@ async def test_mock_llm_adapter_consumer_domain():
 
 
 @pytest.mark.asyncio
-async def test_mock_llm_adapter_general_domain():
-    adapter = MockLLMAdapter()
+async def test_local_query_adapter_general_domain():
+    adapter = LocalQueryAdapter()
     results = await adapter.generate_boolean_queries(
         "What do people think about remote work policies?",
         "general",
@@ -57,8 +57,8 @@ async def test_mock_llm_adapter_general_domain():
 
 
 @pytest.mark.asyncio
-async def test_mock_llm_adapter_empty_keywords():
-    adapter = MockLLMAdapter()
+async def test_local_query_adapter_empty_keywords():
+    adapter = LocalQueryAdapter()
     results = await adapter.generate_boolean_queries("what is the?", "general")
     assert len(results) == 3
     # Should still produce valid queries with fallback keywords

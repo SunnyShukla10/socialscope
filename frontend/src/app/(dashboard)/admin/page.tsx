@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { getAdminOverview, type AdminOverview } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { PilotAdmin } from '@/components/pilot-admin'
+import { AdminWorkspace } from '@/components/admin-workspace'
 import { Key, RefreshCw, Shield } from 'lucide-react'
 
 export default function AdminPage() {
@@ -84,7 +84,7 @@ export default function AdminPage() {
         </div>
       </details>
 
-      <PilotAdmin />
+      <AdminWorkspace />
     </div>
   )
 }

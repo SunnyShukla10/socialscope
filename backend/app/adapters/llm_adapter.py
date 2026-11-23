@@ -32,7 +32,7 @@ def _build_simple_natural_query(keywords: List[str]) -> str:
     return "topic discussion"
 
 
-def _build_mock_candidates(research_question: str, domain: str) -> List[dict]:
+def _build_local_candidates(research_question: str, domain: str) -> List[dict]:
     keywords = _extract_keywords(research_question)
     if not keywords:
         keywords = ["topic", "discussion", "experience", "review"]
@@ -80,11 +80,11 @@ def _build_mock_candidates(research_question: str, domain: str) -> List[dict]:
     return candidates
 
 
-class MockLLMAdapter:
-    """Deterministic mock LLM that generates boolean query suggestions."""
+class LocalQueryAdapter:
+    """Generate deterministic query suggestions locally without an LLM or provider data."""
 
     async def generate_boolean_queries(self, research_question: str, domain: str) -> List[dict]:
-        return _build_mock_candidates(research_question, domain)
+        return _build_local_candidates(research_question, domain)
 
 class RealLLMAdapter:
     """OpenAI-backed LLM adapter."""
@@ -177,4 +177,4 @@ Generate exactly 3 candidates. Do not include markdown or any text outside the J
             raise
 
 def get_llm_adapter():
-    return RealLLMAdapter() if settings.OPENAI_API_KEY else MockLLMAdapter()
+    return RealLLMAdapter() if settings.OPENAI_API_KEY else LocalQueryAdapter()

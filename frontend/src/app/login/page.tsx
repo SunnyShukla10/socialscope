@@ -183,7 +183,7 @@ export default function LoginPage() {
           </form>
 
           <div className="mt-6 rounded-xl border border-indigo-100 bg-indigo-50/70 p-4">
-            <p className="text-xs font-semibold text-primary">Pilot access</p>
+            <p className="text-xs font-semibold text-primary">Account access</p>
             <p className="mt-2 text-xs text-text-muted">Use the individual account provided by your research administrator. Contact them if you need access or a password reset.</p>
           </div>
         </div>

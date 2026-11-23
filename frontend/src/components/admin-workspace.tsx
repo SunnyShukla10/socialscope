@@ -30,7 +30,7 @@ function Pages({ page, count, busy, setPage }: { page: number; count: number; bu
   </div>
 }
 
-export function PilotAdmin() {
+export function AdminWorkspace() {
   const [users, setUsers] = useState<Account[]>([])
   const [activity, setActivity] = useState<Activity[]>([])
   const [reports, setReports] = useState<Report[]>([])

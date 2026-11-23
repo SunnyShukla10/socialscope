@@ -1,13 +1,10 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  distDir: process.env.SOCIALSCOPE_CHECK_BUILD === "1" ? (process.env.SOCIALSCOPE_CHECK_DIR || ".next-validation") : ".next",
+  distDir: process.env.SOCIALSCOPE_BUILD_DIR || '.next',
   experimental: { cpus: 1 },
-  output: process.env.SOCIALSCOPE_CHECK_BUILD === '1' ? undefined : 'standalone',
-  webpack(config) {
-    if (process.env.SOCIALSCOPE_CHECK_BUILD === '1') config.cache = false
-    return config
-  },
+  output: 'standalone',
+  poweredByHeader: false,
   async rewrites() {
     return [
       {
@@ -17,12 +14,9 @@ const nextConfig = {
     ]
   },
   images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: '**',
-      },
-    ],
+    // No application component uses next/image. Do not expose a wildcard
+    // server-side image fetcher; add explicit hosts if optimized images are added.
+    remotePatterns: [],
   },
 }
 

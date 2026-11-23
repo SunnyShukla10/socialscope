@@ -336,7 +336,6 @@ class SocialVaultAdapter(VendorAdapter):
 
     def __init__(self):
         self.api_key = settings.SOCIALVAULT_API_KEY
-        self._mock = MockSocialVaultAdapter()
 
     def get_supported_platforms(self) -> List[str]:
         return list(PLATFORM_GENERATORS.keys())

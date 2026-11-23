@@ -48,4 +48,5 @@ benchmark-plan.json
 !/docs/ROADMAP.md
 !/docs/COLLECTION_FEASIBILITY.md
 !/docs/PORTS_AND_CONFIGURATION.md
+!/docs/PRODUCTION_READINESS.md
 CHANGELOG.md

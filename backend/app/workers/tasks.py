@@ -324,7 +324,7 @@ async def _persist_platform_posts(
                 search_job_id=job.id,
                 account_id=account_id,
                 platform=post_platform,
-                vendor=raw.get("vendor", "mock"),
+                vendor=raw.get("vendor") or "unknown",
                 external_id=str(raw["external_id"]),
                 url=raw.get("url"),
                 body=raw.get("body", ""),
@@ -346,7 +346,7 @@ async def _persist_platform_posts(
                 published_at=raw.get("published_at"),
             )
             .on_conflict_do_nothing(
-                constraint="uq_normalized_post_project_platform_external_id"
+                index_elements=["project_id", "platform", "external_id"]
             )
             .returning(NormalizedPost.id)
         )

@@ -1,15 +1,17 @@
 from pydantic_settings import BaseSettings
-from pydantic import Field, field_validator
-from typing import List
+from pydantic import Field, field_validator, model_validator
+from typing import List, Literal
+from urllib.parse import urlsplit
 
 
 class Settings(BaseSettings):
+    ENV: Literal['development', 'production'] = 'development'
     LOCAL_ADMIN_EMAIL: str = "admin@socialscope.local"
     LOCAL_ADMIN_PASSWORD: str = "password123"
-    BUILD_ID: str = "pilot-local"
+    BUILD_ID: str = "development"
     DATABASE_URL: str = "postgresql+asyncpg://socialscope:socialscope@localhost:5434/socialscope"
     REDIS_URL: str = "redis://localhost:6381/0"
-    SECRET_KEY: str = "change-me-in-production"
+    SECRET_KEY: str = "development-only-change-me-before-hosting"
     XPOZ_API_KEY: str = ""
     SOCIALVAULT_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
@@ -58,7 +60,31 @@ class Settings(BaseSettings):
     def get_cors_origins(self) -> List[str]:
         return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
 
-    model_config = {"env_file": ".env", "case_sensitive": True, "extra": "ignore"}
+    @model_validator(mode='after')
+    def validate_production_settings(self):
+        if self.ENV != 'production':
+            return self
+        secret = self.SECRET_KEY.strip()
+        if len(secret) < 32 or any(marker in secret.casefold() for marker in
+                                  ('change-me', 'replace_with', 'generate_with')):
+            raise ValueError('Production requires an independent signing secret of at least 32 characters')
+        if any(ord(character) < 32 for character in self.CORS_ORIGINS):
+            raise ValueError('Production CORS origins cannot contain control characters')
+        origins = self.get_cors_origins()
+        if not origins:
+            raise ValueError('Production requires an explicit HTTPS browser origin')
+        for origin in origins:
+            parsed = urlsplit(origin)
+            if (parsed.scheme != 'https' or not parsed.hostname or parsed.username is not None
+                    or parsed.password is not None or parsed.path or parsed.query or parsed.fragment
+                    or any(character.isspace() for character in origin)
+                    or '*' in origin or 'YOUR_' in origin.upper() or 'REPLACE_' in origin.upper()):
+                raise ValueError('Production CORS origins must be HTTPS origins without paths or placeholders')
+            # Accessing port also validates its numeric form and valid range.
+            _ = parsed.port
+        return self
+
+    model_config = {"env_file": ".env", "case_sensitive": True, "extra": "ignore", "hide_input_in_errors": True}
 
 
 settings = Settings()

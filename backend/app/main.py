@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from fastapi.encoders import jsonable_encoder
 
 from app.config import settings
+from app.version import VERSION
 from app.database import engine
 
 from app.routes import (
@@ -44,8 +45,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="SocialScope API",
-    description="Historical social media research pilot",
-    version="0.1.0",
+    description="Historical social media research and descriptive analysis",
+    version=VERSION,
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
@@ -80,7 +81,7 @@ app.include_router(feedback.router)
 # ─── Root ─────────────────────────────────────────────────────────────────────
 @app.get("/", include_in_schema=False)
 async def root():
-    return {"service": "SocialScope API", "version": "0.1.0", "docs": "/api/docs"}
+    return {"service": "SocialScope API", "version": VERSION, "docs": "/api/docs"}
 
 
 # ─── Global exception handler ─────────────────────────────────────────────────

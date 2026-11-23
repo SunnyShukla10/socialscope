@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.feedback import Feedback
-from app.schemas.pilot import FeedbackCreate
+from app.schemas.administration import FeedbackCreate
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/api/feedback", tags=["feedback"])

@@ -1,4 +1,4 @@
-"""Small account and feedback forms. Never serialize passwords back to clients."""
+"""Account and feedback request schemas. Never serialize passwords back to clients."""
 import uuid
 from datetime import datetime
 from typing import Literal

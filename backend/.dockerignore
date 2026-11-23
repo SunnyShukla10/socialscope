@@ -6,6 +6,8 @@ venv
 .validation
 __pycache__
 .pytest_cache
+tests
+requirements-dev.txt
 *.pyc
 **/__pycache__
 **/*.pyc

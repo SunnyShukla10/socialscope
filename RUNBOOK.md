@@ -23,7 +23,7 @@ Check dependency health as well as HTTP reachability (substitute your API port i
 Invoke-RestMethod http://127.0.0.1:8102/api/health
 ```
 
-Expected fields are `status: ok`, `database: true`, and `redis: true`. The current endpoint returns HTTP 200 even when status is `degraded`. The connectivity script checks HTTP reachability; the development container health probe checks the database/Redis booleans. Still inspect the response fields and worker logs before accepting the installation. None of these checks contacts a social provider.
+Expected fields are `status: ok`, `database: true`, and `redis: true` with HTTP 200. A failed database or Redis probe returns HTTP 503 and `status: degraded`. Probes run concurrently with bounded timeouts; Redis clients are closed on failures too. Inspect dependency fields and worker logs before accepting the installation. None of these checks contacts a social provider.
 
 Dashboard displays configured-source booleans and version/build. API root reports service version; `/api/sources` includes BUILD_ID. Seed uses LOCAL_ADMIN_EMAIL/PASSWORD; re-running it preserves existing account details. Use the interactive operator tool for password resets. Provider keys stay server-side.
 
@@ -195,6 +195,12 @@ The account form's eye button affects only the password currently being typed; s
 Feedback opens from the sidebar above the page, including on mobile. Its optional **Error details** field preserves pasted line breaks and indentation (maximum 20,000 characters). The message remains required. Both fields survive a failed submission. Reports stay private to same-organization admins and show the exact pasted error in a scrollable text block. Ask reporters to remove secrets before submitting; the application does not automatically collect console logs or error responses.
 
 ## Production deployment controls - 2026-11-17
+
+Runtime services and seed explicitly use `ENV=production`. Startup rejects placeholder/short signing secrets and non-HTTPS, wildcard, placeholder, or path-bearing CORS origins. Supply a unique random signing secret of at least 32 characters and the exact HTTPS origin without a trailing slash. The maintenance migration command receives only its database URL and does not start the authenticated runtime. Development explicitly uses `ENV=development`.
+
+Frontend images now use Node 22, Next.js 16, and React 19. Rebuild both frontend and backend images for this release; do not copy new source into an old image. JWT handling uses PyJWT with the same HS256 token format, signing key, expiration, and session-version checks. Keep the signing key/algorithm stable to preserve valid existing sessions; rotating the key deliberately invalidates them. Runtime Python dependencies are in `backend/requirements.txt`; local test tools are in `backend/requirements-dev.txt` and are excluded from the backend image.
+
+For an existing development frontend dependency volume, rebuild its development image, stop frontend, run `docker compose --env-file .env.development -f compose.development.yml run --rm --no-deps frontend npm ci`, then start frontend again. This refreshes the existing node_modules volume for the new Next/React versions without deleting application data. Local frontend commands require Node 22.12 or newer; the Docker images use Node 22.
 
 Use standalone [compose.production.yml](compose.production.yml) with private configuration copied from [.env.production.example](.env.production.example). Always supply both production flags. Development remains a separate checkout/project with independent storage. DNS, Nginx, Certbot, private configuration, and target-host acceptance remain operator steps.
 

@@ -1,7 +1,8 @@
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from jose import JWTError, jwt
+import jwt
+from jwt import InvalidTokenError
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -49,12 +50,13 @@ class AuthService:
                 credentials.credentials,
                 settings.SECRET_KEY,
                 algorithms=[settings.ALGORITHM],
+                options={"require": ["exp", "sub"]},
             )
             user_id: str = payload.get("sub")
             if user_id is None:
                 raise credentials_exception
             user_id = uuid.UUID(user_id)
-        except (JWTError, ValueError, TypeError):
+        except (InvalidTokenError, ValueError, TypeError):
             raise credentials_exception
 
         result = await db.execute(select(User).where(User.id == user_id))

@@ -1,5 +1,17 @@
 # SocialScope tests and validation
 
+## Production application review - 2026-11-17
+
+Final isolated Python 3.12 run: **249 passed, 1 skipped**, in 102.78 seconds. Dependencies came from the declared runtime/development requirements in an ignored validation folder, including SQLAlchemy 2.0.35, Pydantic 2.11.7, PyJWT 2.15.1, and MCP 1.30.0. The skip is the existing PostgreSQL-only concurrency check; it was not claimed as passed. No warnings were reported in the final run. Provider keys were explicitly blank, and the suite used isolated fixtures/mocks without paid provider requests or real data changes.
+
+The initial shared-environment run exposed an obsolete missing-project expectation. The first exact-pin run exposed SQLite conflict-target handling differences under SQLAlchemy 2.0.35. Both were corrected without relaxing project authorization or post deduplication; the full suite above then passed. A newly added CORS control-character test also caught trimming before validation; production now rejects the raw control characters before splitting/trimming origins.
+
+Frontend validation: all six npm test scripts passed; TypeScript checking passed. The Next.js 16.4.6 / React 19.3.1 Webpack production build completed, including static generation, type checks, tracing, and standalone output. It used the ignored .next-validation-production directory while retaining standalone packaging. The standalone server served the login and a referenced JavaScript chunk with HTTP 200, omitted X-Powered-By, and returned 400 for an unapproved remote image URL. A browser check against that production server with a mocked credential rejection verified inline errors, unchanged input values, no document reload, password visibility, and no horizontal overflow at 390 pixels. This does not replace a hosted end-to-end worker/database test.
+
+Both development and production Compose templates parsed successfully using example values only. The network-enabled npm runtime audit reported zero known vulnerabilities after updates. The audit of all resolved packages in the isolated Windows Python validation folder also reported none. The full npm audit still reports ten high development-tool findings through picomatch/Tailwind 3; neither package appeared in the traced standalone runtime. See [production review](docs/PRODUCTION_READINESS.md) for scope and remaining deployment checks.
+
+For local backend tests, install `backend/requirements-dev.txt`; the production Dockerfile installs only `backend/requirements.txt` and excludes tests/development requirements from its context. Rebuild both application images for this release. Linux image builds/scans, PostgreSQL concurrency, actual worker delivery, DNS/Nginx/Certbot, hosted capacity, and backup restoration remain target-host checks. Earlier dated records below describe earlier revisions and have not been rewritten as new validation.
+
 ## Admin workspace and activity cleanup - 2026-11-17
 
 Seven focused API cleanup tests passed using isolated SQLite fixtures. An earlier combined run of cleanup, pilot-account, and private-account tests passed 26 tests; the seventh cleanup case was added afterward and the seven-case suite passed. Coverage includes authenticated admin access, organization/person scoping, strict cutoff behavior, malformed/timezone-naive/future cutoffs, explicit confirmation, read-only preview, repeated deletion, retained projects/feedback, audit attribution, and rollback if the audit insert fails. These checks do not execute against a hosted PostgreSQL database.
@@ -40,7 +52,7 @@ Then install and run from `backend/` using that interpreter directly; activation
 
 ```powershell
 cd backend
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 .\.venv\Scripts\python.exe -m pytest -q
 .\.venv\Scripts\python.exe -m alembic upgrade head --sql
 ```

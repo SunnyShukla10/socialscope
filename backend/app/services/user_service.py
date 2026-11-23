@@ -4,7 +4,7 @@ from sqlalchemy import func, select, delete, update, or_
 from sqlalchemy.exc import IntegrityError
 from app.models.organization import Organization
 from app.models.user import User
-from app.schemas.pilot import validate_password
+from app.schemas.administration import validate_password
 from app.services.activity_service import ActivityService
 
 

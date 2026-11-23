@@ -581,7 +581,6 @@ class XpozAdapter(VendorAdapter):
 
     def __init__(self):
         self.api_key = settings.XPOZ_API_KEY
-        self._mock = MockXpozAdapter()
 
     async def _before_provider_request(
         self,

@@ -85,7 +85,8 @@ async def test_all_pulls_and_zero_engagement_and_date_bounds(client, auth_header
     invalid = await client.get(base + "/engagement", headers=auth_headers, params={"pull_id": "invalid"})
     assert invalid.status_code == 422
     unrelated = await client.get(f"/api/projects/{uuid.uuid4()}/analytics/engagement", headers=auth_headers)
-    assert unrelated.json() == {"data": [], "metrics": []}
+    assert unrelated.status_code == 404
+    assert unrelated.json() == {"detail": "Project not found"}
 
     from app.services.analytics_service import AnalyticsService
     async with sessions() as db:

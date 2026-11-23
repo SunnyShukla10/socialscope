@@ -12,6 +12,7 @@ x-backend: &backend
   build: ./backend
   env_file: .env.development
   environment: &backend-environment
+    ENV: development
     # Fixed development-only database identity; do not copy a production URL.
     DATABASE_URL: postgresql+asyncpg://socialscope_dev:${SOCIALSCOPE_DEV_DB_PASSWORD:?Run python scripts/setup.py}@postgres:5432/socialscope_dev
     REDIS_URL: redis://redis:6379/0

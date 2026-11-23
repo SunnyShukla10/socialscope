@@ -1,14 +1,14 @@
-# SocialScope research pilot
+# SocialScope research workspace
 
 SocialScope supports topic/question -> optional dates -> source/query selection -> search preview -> bounded collection -> review/exclude -> descriptive analysis -> CSV export. It is an independent adaptation of SocialPulse, with a separate database, volumes, ports, and browser session key.
 
-## Participants (accounts will be added later)
+## Researchers
 
 Participants use the access link and individual account supplied by their administrator. They do not install Docker, configure provider keys, or run setup. Ask the administrator for a password reset if needed. Each user starts with a clean project list and sees only their own projects, results, collections, and exports. Admin activity oversight remains organization-wide.
 
 Use **Feedback / Report an issue** in the sidebar to send a short message. Your account, page path, and timestamp accompany the message. Administrators can review reports and filter activity by person.
 
-No participants have been provisioned by this change. Public signup, invitations, and email recovery are not implemented. Shared encrypted hosting remains a separate operator task.
+Accounts and password resets are managed by your administrator; there is no self-service registration or email recovery. For hosted access, the operator configures the production environment and HTTPS using the [runbook](RUNBOOK.md#production-deployment-controls---2026-11-17).
 
 ## Operator: start locally
 
@@ -18,7 +18,7 @@ Install Docker Desktop (Linux containers/Compose) and Python 3 for the setup hel
 python scripts/setup.py
 ```
 
-Privately edit the newly created `.env.development`. Add `SOCIALVAULT_API_KEY` and `XPOZ_API_KEY` only for intentional live collection tests; never commit or share this file. The pilot uses **the administrator's shared provider accounts**, not a separate paid account for each tester. Setup generates `SECRET_KEY` and `LOCAL_ADMIN_PASSWORD` and preserves any existing .env.
+Privately edit the newly created `.env.development`. Add `SOCIALVAULT_API_KEY` and `XPOZ_API_KEY` only for intentional live collection tests; never commit or share this file. The application uses **the administrator's shared provider accounts**, not a separate paid account for each researcher. Setup generates `SECRET_KEY` and `LOCAL_ADMIN_PASSWORD` and preserves any existing .env.
 
 ```powershell
 docker compose --env-file .env.development -f compose.development.yml up --build -d
@@ -41,7 +41,7 @@ Share the application source, `compose.development.yml`, Dockerfiles, `.env.deve
 
 The intended Markdown guides under `docs/` are allowlisted in `.gitignore`; other documentation artifacts and manifests remain ignored. Review files before including them in a handoff.
 
-This is a pilot handoff, not a production-readiness certification. The dated [validation record](TESTING_GUIDE.md) identifies the remaining Docker/PostgreSQL acceptance checks.
+See the dated [validation record](TESTING_GUIDE.md) for completed checks and the production runbook for target-host deployment and recovery checks.
 
 ## First research workflow
 
@@ -69,9 +69,9 @@ Previews remain small. Full collections stop at their post allocation, exhausted
 
 After the first supervised pilot sessions, prioritize setup friction, query relevance, useful historical coverage, and interpretability of outcomes. Approve a separate bounded live benchmark before spending credits to investigate larger historical yields.
 
-## Operator: prepare accounts for later
+## Operator: manage researcher accounts
 
-After applying migration 014, use **Admin ? Users** to create members in your organization when the pilot is ready. Do not share the initial admin login. Admins can enable/disable users and review activity and reports. The last active admin cannot be disabled. Password resets use the interactive operator tool described in [RUNBOOK.md](RUNBOOK.md); passwords are not command arguments. There is no public registration.
+After applying all migrations, use **Admin → Users → Create user** to add members in your organization. Do not share the initial admin login. Admins can enable/disable users and review activity and reports. The last active admin cannot be disabled. Password resets use the interactive operator tool described in [RUNBOOK.md](RUNBOOK.md); passwords are not command arguments. There is no public registration.
 
 ## Private projects and feedback updates ? 2026-10-27
 
